@@ -1,7 +1,5 @@
 package main
 
-import "log"
-
 func main() {
-	log.Println("Hello")
+	getPods("dev", "sample-namespace")
 }
