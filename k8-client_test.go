@@ -4,37 +4,63 @@ import (
 	"testing"
 )
 
-func TestProcessResponseWithSinglePod(t *testing.T) {
+func TestProcessPodResponse(t *testing.T) {
 	tt := []struct {
-		name      string
-		namespace string
-		input     []byte
-		pod       Pod
+		name        string
+		namespace   string
+		input       []byte
+		podCount    int
+		expectError bool
 	}{
-		{name: "SinglePod Info",
+		{name: "Single Pod Info",
 			namespace: "testNamespace",
 			input: []byte("NAME                                         READY     STATUS    RESTARTS   AGE\n" +
 				"sample-pod-55894cf7cb-tb999       1/1       Running   0          6h"),
-			pod: Pod{
-				Name:     "sample-pod-55894cf7cb-tb999",
-				Total:    1,
-				Ready:    1,
-				Status:   "Running",
-				Restarts: "0",
-				Age:      "6h",
-			},
+			podCount:    1,
+			expectError: false,
+		},
+		{name: "Mupltiple Pod Info",
+			namespace: "testNamespace",
+			input: []byte("NAME                                         READY     STATUS    RESTARTS   AGE\n" +
+				"sample-pod-55894cf7cb-tb999       1/1       Running   0          6h\n" +
+				"sample-pod-55894cf7cb-tb888       1/1       Running   0          6h\n" +
+				"sample-pod-55894cf7cb-tb666       1/1       Running   0          6h"),
+			podCount:    3,
+			expectError: false,
+		},
+		{name: "Wrong Header Line",
+			namespace: "testNamespace",
+			input: []byte("AME                                         READY     STATUS    RESTARTS   AGE\n" +
+				"sample-pod-55894cf7cb-tb666       1/1       Running   0          6h"),
+			podCount:    0,
+			expectError: true,
+		},
+		{name: "Wrong Pod line",
+			namespace: "testNamespace",
+			input: []byte("NAME                                         READY     STATUS    RESTARTS   AGE\n" +
+				"sample-pod-55894cf7cb-tb666       A/1       Running   0          6h"),
+			podCount:    0,
+			expectError: true,
 		},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			ns, _ := processPodResponse(tc.namespace, tc.input)
+			ns, err := processPodResponse(tc.namespace, tc.input)
 
-			if ns.Name != tc.namespace {
-				t.Errorf("Expected namespace name '%v', got '%v'", tc.namespace, ns.Name)
+			if tc.expectError && err == nil {
+				t.Error("Expected error but not received")
 			}
-			if len(ns.Pods) != 1 {
-				t.Errorf("Expected '%v' pod, got '%v'", 1, len(ns.Pods))
+			if !tc.expectError && err != nil {
+				t.Errorf("Error not expected, got: %v", err)
+			}
+			if err == nil {
+				if ns.Name != tc.namespace {
+					t.Errorf("Expected namespace name '%v', got '%v'", tc.namespace, ns.Name)
+				}
+				if len(ns.Pods) != tc.podCount {
+					t.Errorf("Expected '%v' pod, got '%v'", tc.podCount, len(ns.Pods))
+				}
 			}
 		})
 	}

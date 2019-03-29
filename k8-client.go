@@ -26,6 +26,7 @@ type Pod struct {
 }
 
 func getPods(context, namespace string) Namespace {
+	//TODO: Figure out how to test exec.Command.
 	cmd := exec.Command("kubectl", fmt.Sprintf("--context=%v", context), fmt.Sprintf("-n=%v", namespace), "get", "pods")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -56,8 +57,7 @@ func processPodResponse(namespace string, bytes []byte) (Namespace, error) {
 	lineSplit := strings.Split(string(bytes), "\n")
 
 	if !strings.HasPrefix(lineSplit[0], "NAME") {
-		return ns, nil
-		//return ns, errors.New(fmt.Sprintf("Pod Response does not start with header string.\n Actual:\n%v ", string(bytes)))
+		return ns, errors.New(fmt.Sprintf("Pod Response does not start with header string.\n Actual:\n%v ", string(bytes)))
 	}
 
 	pods := make([]Pod, 0)
@@ -65,7 +65,7 @@ func processPodResponse(namespace string, bytes []byte) (Namespace, error) {
 		if len(strings.TrimSpace(line)) > 0 {
 			podInfo, err := parsePodInfoLine(line)
 			if err != nil {
-				return ns, nil
+				return ns, err
 			}
 			pods = append(pods, podInfo)
 		}
