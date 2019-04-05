@@ -1,0 +1,10 @@
+[
+  {
+    "id": 0,
+    "name": "jenkins",
+    "context": "tools",
+    "namespaces": [
+      "id-jenkins-slaves"
+    ]
+  }
+]

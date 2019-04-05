@@ -18,7 +18,7 @@ type Group struct {
 	Id         int      `json:"id"`
 	Name       string   `json:"name"`
 	Context    string   `json:"context"`
-	Namespaces []string `json:"namespace"`
+	Namespaces []string `json:"namespaces"`
 }
 
 type Gui struct {
