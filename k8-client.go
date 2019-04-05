@@ -6,8 +6,10 @@ import (
 	"github.com/pkg/errors"
 	"log"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type Namespace struct {
@@ -38,8 +40,7 @@ func getPods(context, namespace string) Namespace {
 	}
 
 	if len(stderr.Bytes()) != 0 {
-		log.Printf("stderr: %v", stderr.String())
-		return Namespace{Error: errors.New(stderr.String())}
+		return Namespace{Name: namespace, Error: errors.New(stderr.String())}
 	}
 
 	ns, err := processPodResponse(namespace, stdout.Bytes())
@@ -124,4 +125,40 @@ func cleanSplit(input string) []string {
 	}
 
 	return cleanSplit
+}
+
+func updateNamespaces(g *Group) ([]Namespace, error) {
+	var wg sync.WaitGroup
+
+	nsInfoCh := make(chan Namespace, len(g.Namespaces))
+	wg.Add(len(g.Namespaces))
+
+	// Get pod info in parallel
+	for i := range g.Namespaces {
+		go func(nsInfoCh chan<- Namespace, ctxName, nsName string) {
+			nsInfoCh <- getPods(ctxName, nsName)
+		}(nsInfoCh, g.Context, g.Namespaces[i])
+	}
+
+	// Wait for everything to finish and collect pod info into one slice
+	go func() {
+		wg.Wait()
+		close(nsInfoCh)
+	}()
+
+	nsInfos := make([]Namespace, 0)
+	for nsInfo := range nsInfoCh {
+		nsInfo.sortPods()
+		nsInfos = append(nsInfos, nsInfo)
+		wg.Done()
+	}
+	sort.Slice(nsInfos, func(i, j int) bool { return nsInfos[i].Name < nsInfos[j].Name })
+
+	return nsInfos, nil
+}
+
+func (ns *Namespace) sortPods() {
+	sort.Slice(ns.Pods, func(i, j int) bool {
+		return ns.Pods[i].Name < ns.Pods[j].Name
+	})
 }
