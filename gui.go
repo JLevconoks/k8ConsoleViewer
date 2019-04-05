@@ -13,6 +13,7 @@ const (
 	READY_COL_WIDTH    = 7
 	STATUS_COL_WIDTH   = 20
 	RESTARTS_COL_WIDTH = 10
+	STATUS_AREA_HEIGHT = 2
 )
 
 type Gui struct {
@@ -23,7 +24,13 @@ type Gui struct {
 	width         int
 	curX          int
 	curY          int
+	Positions     Positions
 	mutex         sync.Mutex
+}
+
+type Positions struct {
+	namespaces map[int]*Namespace
+	pods       map[int]*Pod
 }
 
 func (gui *Gui) redrawAll() {
@@ -58,6 +65,7 @@ func (gui *Gui) moveCursor(x, y int) {
 
 func (gui *Gui) redrawCursor() {
 	termbox.SetCursor(gui.curX, gui.curY)
+	gui.printStatusBar()
 	flush()
 }
 
@@ -72,27 +80,46 @@ func (gui *Gui) printHeaders() {
 	printDefaultLine("AGE", 3+NAME_COL_WIDTH+READY_COL_WIDTH+STATUS_COL_WIDTH+RESTARTS_COL_WIDTH, 4)
 }
 
+func (gui *Gui) printStatusBar() {
+	if gui.Positions.pods[gui.curY] != nil {
+		clearLine(0, gui.height-1, gui.width, termbox.ColorDefault, termbox.ColorDefault)
+		printDefaultLine(gui.Positions.pods[gui.curY].Name, 0, gui.height-1)
+	} else if gui.Positions.namespaces[gui.curY] != nil {
+		clearLine(0, gui.height-1, gui.width, termbox.ColorDefault, termbox.ColorDefault)
+		printDefaultLine(gui.Positions.namespaces[gui.curY].Name, 0, gui.height-1)
+	}
+}
+
 func (gui *Gui) printNamespace() {
 	yOffset := 5
+	nsPositions := make(map[int]*Namespace)
+	podPositions := make(map[int]*Pod)
+
 	for nsIndex, ns := range gui.Namespaces {
-		if yOffset < gui.height-4 {
+		if yOffset < gui.height-STATUS_AREA_HEIGHT {
 			printDefaultLine(ns.Name, 0, yOffset)
+			nsPositions[yOffset] = &gui.Namespaces[nsIndex]
 			yOffset++
 			if ns.Error != nil {
 				printLine(ns.Error.Error(), 3, yOffset, termbox.ColorYellow, termbox.ColorDefault)
 				yOffset++
 			} else {
-				yOffset = gui.Namespaces[nsIndex].printPods(gui.height, yOffset)
+				yOffset = gui.Namespaces[nsIndex].printPods(gui.height, yOffset, podPositions)
 			}
 		} else {
 			break
 		}
 	}
+
+	gui.mutex.Lock()
+	gui.Positions = Positions{namespaces: nsPositions, pods: podPositions}
+	gui.mutex.Unlock()
 }
 
-func (ns *Namespace) printPods(windowHeight, yOffset int) int {
-	for _, p := range ns.Pods {
-		if yOffset < windowHeight-4 {
+func (ns *Namespace) printPods(windowHeight, yOffset int, podPositions map[int]*Pod) int {
+	for i, p := range ns.Pods {
+		if yOffset < windowHeight-STATUS_AREA_HEIGHT {
+			podPositions[yOffset] = &ns.Pods[i]
 			running := p.Status == "Running"
 
 			if running && p.Ready >= p.Total {
@@ -116,6 +143,12 @@ func (pod *Pod) printPodInfo(yOffset int, fg termbox.Attribute) {
 	printLine(pod.Status, 3+NAME_COL_WIDTH+READY_COL_WIDTH, yOffset, fg, termbox.ColorDefault)
 	printLine(pod.Restarts, 3+NAME_COL_WIDTH+READY_COL_WIDTH+STATUS_COL_WIDTH, yOffset, fg, termbox.ColorDefault)
 	printLine(pod.Age, 3+NAME_COL_WIDTH+READY_COL_WIDTH+STATUS_COL_WIDTH+RESTARTS_COL_WIDTH, yOffset, fg, termbox.ColorDefault)
+}
+
+func clearLine(x, y, endx int, fg, bg termbox.Attribute) {
+	for i := x; i <= endx; i++ {
+		termbox.SetCell(i, y, ' ', fg, bg)
+	}
 }
 
 func printDefaultLine(line string, x, y int) {
