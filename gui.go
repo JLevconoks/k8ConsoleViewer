@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/nsf/termbox-go"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -14,10 +15,49 @@ const (
 	RESTARTS_COL_WIDTH = 10
 )
 
+type Gui struct {
+	Group         string
+	Namespaces    []Namespace
+	TimeToExecute time.Duration
+	height        int
+	width         int
+	curX          int
+	curY          int
+	mutex         sync.Mutex
+}
+
 func (gui *Gui) redrawAll() {
 	clear()
 	gui.printHeaders()
 	gui.printNamespace()
+	gui.redrawCursor()
+	flush()
+}
+
+func (gui *Gui) moveCursorDown() {
+	if gui.curY < gui.height {
+		gui.moveCursor(gui.curX, gui.curY+1)
+	}
+}
+
+func (gui *Gui) moveCursorUp() {
+	if gui.curY > 0 {
+		gui.moveCursor(gui.curX, gui.curY-1)
+	}
+}
+
+func (gui *Gui) moveCursor(x, y int) {
+	gui.mutex.Lock()
+	gui.curX = x
+	gui.curY = y
+	gui.mutex.Unlock()
+
+	log.Println("Cursor on: ", gui.curY)
+	gui.redrawCursor()
+}
+
+func (gui *Gui) redrawCursor() {
+	termbox.SetCursor(gui.curX, gui.curY)
 	flush()
 }
 

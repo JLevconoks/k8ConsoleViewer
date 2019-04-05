@@ -10,7 +10,6 @@ import (
 	"os"
 	"sort"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -19,15 +18,6 @@ type Group struct {
 	Name       string   `json:"name"`
 	Context    string   `json:"context"`
 	Namespaces []string `json:"namespaces"`
-}
-
-type Gui struct {
-	Group         string
-	Namespaces    []Namespace
-	TimeToExecute time.Duration
-	height        int
-	width         int
-	mutex         sync.Mutex
 }
 
 func main() {
@@ -104,7 +94,12 @@ mainEventLoop:
 			switch ev.Key {
 			case termbox.KeyEsc, termbox.KeyCtrlC:
 				break mainEventLoop
+			case termbox.KeyArrowDown:
+				gui.moveCursorDown()
+			case termbox.KeyArrowUp:
+				gui.moveCursorUp()
 			}
+
 		case termbox.EventResize:
 			gui.updateWindowSize()
 			updateGuiCh <- struct{}{}
