@@ -19,12 +19,13 @@ type Namespace struct {
 }
 
 type Pod struct {
-	Name     string
-	Total    int // Total and ready are represented as 0/1 or 2/2 etc.
-	Ready    int
-	Status   string
-	Restarts string
-	Age      string
+	Name      string
+	Total     int // Total and ready are represented as 0/1 or 2/2 etc.
+	Ready     int
+	Status    string
+	Restarts  string
+	Age       string
+	Namespace *Namespace
 }
 
 func getPods(context, namespace string) Namespace {
@@ -64,11 +65,12 @@ func processPodResponse(namespace string, bytes []byte) (Namespace, error) {
 	pods := make([]Pod, 0)
 	for _, line := range lineSplit[1:] {
 		if len(strings.TrimSpace(line)) > 0 {
-			podInfo, err := parsePodInfoLine(line)
+			pod, err := parsePodLine(line)
 			if err != nil {
 				return ns, err
 			}
-			pods = append(pods, podInfo)
+			pod.Namespace = &ns
+			pods = append(pods, pod)
 		}
 	}
 
@@ -76,7 +78,7 @@ func processPodResponse(namespace string, bytes []byte) (Namespace, error) {
 	return ns, nil
 }
 
-func parsePodInfoLine(s string) (Pod, error) {
+func parsePodLine(s string) (Pod, error) {
 	cleanSplit := cleanSplit(s)
 
 	if len(cleanSplit) != 5 {

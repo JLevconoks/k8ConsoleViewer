@@ -66,7 +66,7 @@ func TestProcessPodResponse(t *testing.T) {
 	}
 }
 
-func TestParsePodInfoLine(t *testing.T) {
+func TestParsePodLine(t *testing.T) {
 	tt := []struct {
 		name        string
 		input       string
@@ -100,7 +100,7 @@ func TestParsePodInfoLine(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := parsePodInfoLine(tc.input)
+			result, err := parsePodLine(tc.input)
 			pod := tc.expected
 			if tc.expectError && err == nil {
 				t.Error("Expected error but not received")

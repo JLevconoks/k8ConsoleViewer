@@ -13,11 +13,12 @@ const (
 	READY_COL_WIDTH    = 7
 	STATUS_COL_WIDTH   = 20
 	RESTARTS_COL_WIDTH = 10
-	STATUS_AREA_HEIGHT = 2
+	STATUS_AREA_HEIGHT = 4
 )
 
 type Gui struct {
 	Group         string
+	Context       string
 	Namespaces    []Namespace
 	TimeToExecute time.Duration
 	height        int
@@ -65,7 +66,7 @@ func (gui *Gui) moveCursor(x, y int) {
 
 func (gui *Gui) redrawCursor() {
 	termbox.SetCursor(gui.curX, gui.curY)
-	gui.printStatusBar()
+	gui.printStatusArea()
 	flush()
 }
 
@@ -80,13 +81,27 @@ func (gui *Gui) printHeaders() {
 	printDefaultLine("AGE", 3+NAME_COL_WIDTH+READY_COL_WIDTH+STATUS_COL_WIDTH+RESTARTS_COL_WIDTH, 4)
 }
 
-func (gui *Gui) printStatusBar() {
-	if gui.Positions.pods[gui.curY] != nil {
-		clearLine(0, gui.height-1, gui.width, termbox.ColorDefault, termbox.ColorDefault)
-		printDefaultLine(gui.Positions.pods[gui.curY].Name, 0, gui.height-1)
-	} else if gui.Positions.namespaces[gui.curY] != nil {
-		clearLine(0, gui.height-1, gui.width, termbox.ColorDefault, termbox.ColorDefault)
-		printDefaultLine(gui.Positions.namespaces[gui.curY].Name, 0, gui.height-1)
+func (gui *Gui) printStatusArea() {
+	if gui.Positions.namespaces[gui.curY] != nil {
+		ns := gui.Positions.namespaces[gui.curY]
+
+		all := fmt.Sprintf("kubectl --context %v -n %v get all", gui.Context, ns.Name)
+		ingress := fmt.Sprintf("kubectl --context %v -n %v get ingress", gui.Context, ns.Name)
+		events := fmt.Sprintf("kubectl --context %v -n %v get ev --sort-by=.lastTimestamp", gui.Context, ns.Name)
+
+		clearStatusArea()
+		printDefaultLine(all, 0, gui.height-3)
+		printDefaultLine(ingress, 0, gui.height-2)
+		printDefaultLine(events, 0, gui.height-1)
+	} else if gui.Positions.pods[gui.curY] != nil {
+		pod := gui.Positions.pods[gui.curY]
+
+		log := fmt.Sprintf("kubectl --context %v -n %v logs %v", gui.Context, pod.Namespace.Name, pod.Name)
+		exec := fmt.Sprintf("kubectl --context %v -n %v exec -it %v /bin/sh", gui.Context, pod.Namespace.Name, pod.Name)
+
+		clearStatusArea()
+		printDefaultLine(log, 0, gui.height-3)
+		printDefaultLine(exec, 0, gui.height-2)
 	}
 }
 
@@ -180,6 +195,15 @@ func clear() {
 		termbox.Close()
 		log.Fatal("termbox.Clear(): ", err)
 	}
+}
+
+func clearStatusArea() {
+	width, height := termbox.Size()
+
+	for i := height - STATUS_AREA_HEIGHT; i < height; i++ {
+		clearLine(0, i, width, termbox.ColorDefault, termbox.ColorDefault)
+	}
+
 }
 
 func flush() {
