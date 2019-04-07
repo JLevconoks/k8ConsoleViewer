@@ -14,19 +14,22 @@ const (
 	STATUS_COL_WIDTH   = 20
 	RESTARTS_COL_WIDTH = 10
 	STATUS_AREA_HEIGHT = 4
+	TOP_AREA_HEIGHT    = 4
 )
 
 type Gui struct {
-	Group         string
-	Context       string
-	Namespaces    []Namespace
-	TimeToExecute time.Duration
-	height        int
-	width         int
-	curX          int
-	curY          int
-	Positions     Positions
-	mutex         sync.Mutex
+	Group           string
+	Context         string
+	Namespaces      []Namespace
+	TimeToExecute   time.Duration
+	height          int
+	width           int
+	curX            int
+	curY            int
+	curTopBorder    int
+	curBottomBorder int
+	Positions       Positions
+	mutex           sync.Mutex
 }
 
 type Positions struct {
@@ -38,18 +41,19 @@ func (gui *Gui) redrawAll() {
 	clear()
 	gui.printHeaders()
 	gui.printNamespace()
-	gui.redrawCursor()
+	gui.adjustCursorPosition()
+	gui.printStatusArea()
 	flush()
 }
 
 func (gui *Gui) moveCursorDown() {
-	if gui.curY < gui.height {
+	if gui.curY < gui.curBottomBorder {
 		gui.moveCursor(gui.curX, gui.curY+1)
 	}
 }
 
 func (gui *Gui) moveCursorUp() {
-	if gui.curY > 0 {
+	if gui.curY > gui.curTopBorder {
 		gui.moveCursor(gui.curX, gui.curY-1)
 	}
 }
@@ -68,6 +72,14 @@ func (gui *Gui) redrawCursor() {
 	termbox.SetCursor(gui.curX, gui.curY)
 	gui.printStatusArea()
 	flush()
+}
+
+func (gui *Gui) adjustCursorPosition() {
+	if gui.curY > gui.curBottomBorder {
+		gui.moveCursor(gui.curX, gui.curBottomBorder)
+	} else if gui.curY < gui.curTopBorder {
+		gui.moveCursor(gui.curX, gui.curTopBorder)
+	}
 }
 
 func (gui *Gui) printHeaders() {
@@ -106,7 +118,7 @@ func (gui *Gui) printStatusArea() {
 }
 
 func (gui *Gui) printNamespace() {
-	yOffset := 5
+	yOffset := TOP_AREA_HEIGHT + 1
 	nsPositions := make(map[int]*Namespace)
 	podPositions := make(map[int]*Pod)
 
@@ -128,6 +140,7 @@ func (gui *Gui) printNamespace() {
 
 	gui.mutex.Lock()
 	gui.Positions = Positions{namespaces: nsPositions, pods: podPositions}
+	gui.curBottomBorder = yOffset - 1
 	gui.mutex.Unlock()
 }
 

@@ -56,8 +56,9 @@ func main() {
 	termbox.SetInputMode(termbox.InputEsc)
 
 	gui := Gui{
-		Group:   group.Name,
-		Context: group.Context,
+		Group:        group.Name,
+		Context:      group.Context,
+		curTopBorder: TOP_AREA_HEIGHT + 1,
 	}
 	gui.updateWindowSize()
 
