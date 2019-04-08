@@ -108,11 +108,11 @@ func (gui *Gui) printStatusArea() {
 	} else if gui.Positions.pods[gui.curY] != nil {
 		pod := gui.Positions.pods[gui.curY]
 
-		log := fmt.Sprintf("kubectl --context %v -n %v logs %v", gui.Context, pod.Namespace.Name, pod.Name)
+		podLog := fmt.Sprintf("kubectl --context %v -n %v logs %v", gui.Context, pod.Namespace.Name, pod.Name)
 		exec := fmt.Sprintf("kubectl --context %v -n %v exec -it %v /bin/sh", gui.Context, pod.Namespace.Name, pod.Name)
 
 		clearStatusArea()
-		printDefaultLine(log, 0, gui.height-3)
+		printDefaultLine(podLog, 0, gui.height-3)
 		printDefaultLine(exec, 0, gui.height-2)
 	}
 }
