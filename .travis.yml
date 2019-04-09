@@ -1,4 +1,15 @@
 language: go
 go:
-  - 1.11.x
-script: go test -v ./...
+- 1.11.x
+script:
+  - go test -v ./...
+  - GOOS=darwin GOARCH=amd64 go build .
+deploy:
+  provider: releases
+  api_key:
+    secure: T/WJSiARocReLRCxk+Z6chdjf1LBaLzbIPU3mijyd8wiI24vNW5G24+QeNPmP/j9DNffpl+Xr9bdH6PB5wl/ynFamjSSw5pniy2Pi5inyUPX1GvLkKMu1Hiw4JJUPIUbyRFKHvY1BF05YcK3h6spdUBPPMtj1nztxwClaO4eOf84Vn72smD/DLjXvSgJcrHxeisEgDNF6R/+dMYZ2gdACKDyf53B4a9bBBaOr/3mNNJasbaxB4XAlZkfQCoeumRm40ipCO57Cuvcmf+HxKiEdh6ow1r0E/k9FExq5m9qJssLzkaI4iqmSrhr5yxIqyDw3ZOu7NnQgPqpj85n+sdDIlVuvQM1AR3Tl/qTta+3msFmJv8NjK8fZgdFP4oMQpYfCb7vy7OEwncXl+2wzS3Xnqs9xBTwxeJak+94EfpCX8X3DUVcK/iXSlsxUjKBHo2cNdFLSBGBXFt6nPndk8D6HLYpkrajnAi7EFB9BZuzaauAYVl/r0YR2OiGOnez+zowV15S/Ff37TxfGwn/Rtx2+E4TzuulI0OWAajR7kGXJSj8Bi231WERCpxKHELHaGL7ns/M8FMWFrA4otghX7dFrpR1ajcFFIC4h19Lfn+AJg21riQeM5sGeKv18W4gLIziCP6huOGfotmIQGjVddHTgQYWD5pIAuXY9maF9vhgVhg=
+  file: k8ConsoleViewer
+  skip_cleanup: true
+  on:
+    repo: JLevconoks/k8ConsoleViewer
+    tags: true
