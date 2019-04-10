@@ -4,7 +4,16 @@
     "name": "jenkins",
     "context": "tools",
     "namespaces": [
-      "id-jenkins-slaves"
+      "jenkins-slaves"
+    ]
+  },
+  {
+    "id": 1,
+    "name": "mynamespace",
+    "context": "dev",
+    "namespaces": [
+      "app1_namespace",
+      "app2_namespace"
     ]
   }
 ]

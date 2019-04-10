@@ -155,7 +155,6 @@ func updateNamespaces(g *Group) ([]Namespace, error) {
 		wg.Done()
 	}
 	sort.Slice(nsInfos, func(i, j int) bool { return nsInfos[i].Name < nsInfos[j].Name })
-
 	return nsInfos, nil
 }
 
