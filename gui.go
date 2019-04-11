@@ -43,6 +43,8 @@ type Positions struct {
 
 func (gui *Gui) redrawAll() {
 	clear()
+	//TODO Need to replace loading sign at some point.
+	printLine("Loading info...", 0, 5, termbox.ColorDefault, termbox.ColorDefault)
 	gui.printHeaders()
 	gui.printMainInfo()
 	gui.adjustCursorPosition()
