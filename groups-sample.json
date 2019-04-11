@@ -1,10 +1,10 @@
 [
   {
     "id": 0,
-    "name": "jenkins",
-    "context": "tools",
+    "name": "dev",
+    "context": "dev",
     "namespaces": [
-      "jenkins-slaves"
+      "app1_dev"
     ]
   },
   {
