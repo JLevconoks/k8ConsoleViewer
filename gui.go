@@ -225,6 +225,11 @@ func (gui *Gui) updateWindowSize() {
 	gui.mutex.Unlock()
 }
 
+func (gui *Gui) handleMouseKey(y int) {
+	gui.moveCursor(0, y)
+	gui.adjustCursorPosition()
+}
+
 func (pod *Pod) readyString() string {
 	return fmt.Sprintf("%v/%v", pod.Ready, pod.Total)
 }

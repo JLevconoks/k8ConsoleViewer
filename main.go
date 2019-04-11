@@ -53,7 +53,7 @@ func main() {
 
 	logToFile()
 
-	termbox.SetInputMode(termbox.InputEsc)
+	termbox.SetInputMode(termbox.InputEsc | termbox.InputMouse)
 
 	gui := Gui{
 		Group:        group.Name,
@@ -99,6 +99,15 @@ mainEventLoop:
 			case termbox.KeyArrowDown:
 				gui.moveCursorDown()
 			case termbox.KeyArrowUp:
+				gui.moveCursorUp()
+			}
+		case termbox.EventMouse:
+			switch ev.Key {
+			case termbox.MouseLeft:
+				gui.handleMouseKey(ev.MouseY)
+			case termbox.MouseWheelDown:
+				gui.moveCursorDown()
+			case termbox.MouseWheelUp:
 				gui.moveCursorUp()
 			}
 		case termbox.EventResize:
