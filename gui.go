@@ -37,6 +37,7 @@ type Gui struct {
 type Positions struct {
 	namespaces map[int]*Namespace
 	pods       map[int]*Pod
+	errors     map[int]string
 	lastIndex  int
 }
 
@@ -56,7 +57,6 @@ func (gui *Gui) moveCursorDown() {
 		gui.mutex.Lock()
 		gui.scrollOffset++
 		gui.mutex.Unlock()
-		log.Println(gui.curBottomBorder)
 		gui.redrawAll()
 	}
 }
@@ -69,7 +69,6 @@ func (gui *Gui) moveCursorUp() {
 			gui.mutex.Lock()
 			gui.scrollOffset--
 			gui.mutex.Unlock()
-			log.Println(gui.scrollOffset)
 			gui.redrawAll()
 		}
 	}
@@ -109,8 +108,9 @@ func (gui *Gui) printHeaders() {
 }
 
 func (gui *Gui) printStatusArea() {
-	if gui.Positions.namespaces[gui.curY] != nil {
-		ns := gui.Positions.namespaces[gui.curY]
+	index := gui.curY - INFO_AREA_START + gui.scrollOffset
+	if gui.Positions.hasNamespace(index) {
+		ns := gui.Positions.namespaces[index]
 
 		all := fmt.Sprintf("kubectl --context %v -n %v get all", gui.Context, ns.Name)
 		ingress := fmt.Sprintf("kubectl --context %v -n %v get ingress", gui.Context, ns.Name)
@@ -120,8 +120,8 @@ func (gui *Gui) printStatusArea() {
 		printDefaultLine(all, 0, gui.height-3)
 		printDefaultLine(ingress, 0, gui.height-2)
 		printDefaultLine(events, 0, gui.height-1)
-	} else if gui.Positions.pods[gui.curY] != nil {
-		pod := gui.Positions.pods[gui.curY]
+	} else if gui.Positions.hasPod(index) {
+		pod := gui.Positions.pods[index]
 
 		podLog := fmt.Sprintf("kubectl --context %v -n %v logs %v", gui.Context, pod.Namespace.Name, pod.Name)
 		exec := fmt.Sprintf("kubectl --context %v -n %v exec -it %v /bin/sh", gui.Context, pod.Namespace.Name, pod.Name)
@@ -129,6 +129,8 @@ func (gui *Gui) printStatusArea() {
 		clearStatusArea()
 		printDefaultLine(podLog, 0, gui.height-3)
 		printDefaultLine(exec, 0, gui.height-2)
+	} else {
+		clearStatusArea()
 	}
 }
 
@@ -136,23 +138,28 @@ func (gui *Gui) printMainInfo() {
 	position := 0
 	nsPositions := make(map[int]*Namespace)
 	podPositions := make(map[int]*Pod)
+	errPositions := make(map[int]string)
 
 	//TODO Need to move position calculation out of screen refresh loop.
-	for nsIndex := range gui.Namespaces {
+	for nsIndex, ns := range gui.Namespaces {
 		nsPositions[position] = &gui.Namespaces[nsIndex]
 		position++
+		if ns.Error != nil {
+			errPositions[position] = ns.Error.Error()
+			position++
+		}
 		for podIndex := range gui.Namespaces[nsIndex].Pods {
 			podPositions[position] = &gui.Namespaces[nsIndex].Pods[podIndex]
 			position++
 		}
 	}
 	gui.mutex.Lock()
-	gui.Positions = Positions{namespaces: nsPositions, pods: podPositions, lastIndex: position - 1}
+	gui.Positions = Positions{namespaces: nsPositions, pods: podPositions, errors: errPositions, lastIndex: position - 1}
 	gui.mutex.Unlock()
 
 	offset := gui.scrollOffset
 	yPosition := INFO_AREA_START
-	for gui.Positions.hasNamespace(offset) || gui.Positions.hasPod(offset) {
+	for gui.Positions.hasNamespace(offset) || gui.Positions.hasPod(offset) || gui.Positions.hasError(offset) {
 		if yPosition < gui.height-STATUS_AREA_HEIGHT {
 			if gui.Positions.hasNamespace(offset) {
 				printDefaultLine(gui.Positions.namespaces[offset].Name, 0, yPosition)
@@ -160,6 +167,10 @@ func (gui *Gui) printMainInfo() {
 			if gui.Positions.hasPod(offset) {
 				gui.Positions.pods[offset].printPodInfo(yPosition)
 			}
+			if gui.Positions.hasError(offset) {
+				printLine(gui.Positions.errors[offset], 3, yPosition, termbox.ColorYellow, termbox.ColorDefault)
+			}
+
 			offset++
 			yPosition++
 		} else {
@@ -224,6 +235,10 @@ func (p *Positions) hasNamespace(index int) bool {
 
 func (p *Positions) hasPod(index int) bool {
 	return p.pods[index] != nil
+}
+
+func (p *Positions) hasError(index int) bool {
+	return len(p.errors[index]) > 0
 }
 
 func clear() {
