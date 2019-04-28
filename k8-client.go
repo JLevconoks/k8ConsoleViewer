@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
+	k8sCmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	"log"
-	"os/exec"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -29,13 +30,11 @@ type Pod struct {
 }
 
 func getPods(context, namespace string) Namespace {
-	//TODO: Figure out how to test exec.Command.
-	cmd := exec.Command("kubectl", fmt.Sprintf("--context=%v", context), fmt.Sprintf("-n=%v", namespace), "get", "pods")
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	c := k8sCmd.NewKubectlCommand(os.Stdin, &stdout, &stderr)
+	c.SetArgs([]string{fmt.Sprintf("--context=%v", context), fmt.Sprintf("-n=%v", namespace), "get", "pods"})
 
-	err := cmd.Run()
+	err := c.Execute()
 	if err != nil {
 		log.Printf("cmd.Run() failed with %v\n", err)
 	}
