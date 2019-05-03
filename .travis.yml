@@ -13,3 +13,6 @@ deploy:
   on:
     repo: JLevconoks/k8ConsoleViewer
     tags: true
+branches:
+  only:
+    - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
