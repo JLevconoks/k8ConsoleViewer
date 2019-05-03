@@ -1,16 +1,19 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
+	"flag"
 	"github.com/pkg/errors"
-	k8sCmd "k8s.io/kubernetes/pkg/kubectl/cmd"
-	"log"
+	"k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"os"
+	"path/filepath"
 	"sort"
-	"strconv"
-	"strings"
 	"sync"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
 type Namespace struct {
@@ -21,111 +24,85 @@ type Namespace struct {
 
 type Pod struct {
 	Name      string
-	Total     int // Total and ready are represented as 0/1 or 2/2 etc.
+	Total     int
 	Ready     int
 	Status    string
-	Restarts  string
+	Restarts  int
 	Age       string
 	Namespace *Namespace
 }
 
-func getPods(context, namespace string) Namespace {
-	var stdout, stderr bytes.Buffer
-	c := k8sCmd.NewKubectlCommand(os.Stdin, &stdout, &stderr)
-	c.SetArgs([]string{fmt.Sprintf("--context=%v", context), fmt.Sprintf("-n=%v", namespace), "get", "pods"})
+var k8client *kubernetes.Clientset
 
-	err := c.Execute()
+func NewK8ClientForContext(context string) error {
+	var kubeconfig *string
+	configPath := filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return errors.New("No config found in ~/.kube")
+	}
+	kubeconfig = flag.String("kubeconfig", configPath, "(optional) absolute path to the kubeconfig file")
+
+	flag.Parse()
+
+	config, err := buildConfigFromFlags(context, *kubeconfig)
 	if err != nil {
-		log.Printf("cmd.Run() failed with %v\n", err)
+		return err
 	}
 
-	if len(stderr.Bytes()) != 0 {
-		return Namespace{Name: namespace, Error: errors.New(stderr.String())}
-	}
-
-	ns, err := processPodResponse(namespace, stdout.Bytes())
-
+	k8client, err = kubernetes.NewForConfig(config)
 	if err != nil {
-		return Namespace{Error: err}
+		return err
 	}
 
+	return nil
+}
+
+func getPods(namespace string) Namespace {
+	ns := Namespace{Name: namespace}
+
+	pods, err := k8client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		ns.Error = err
+		return ns
+	}
+
+	ns.Name = namespace
+	ns.Pods = make([]Pod, len(pods.Items))
+
+	for index, podItem := range pods.Items {
+		pod := Pod{
+			Name:      podItem.Name,
+			Status:    string(podItem.Status.Phase),
+			Total:     len(podItem.Status.ContainerStatuses),
+			Ready:     countReady(podItem),
+			Restarts:  countRestarts(podItem),
+			Age:       "_",
+			Namespace: &ns,
+		}
+
+		ns.Pods[index] = pod
+	}
 	return ns
 }
 
-func processPodResponse(namespace string, bytes []byte) (Namespace, error) {
-	ns := Namespace{Name: namespace}
-
-	lineSplit := strings.Split(string(bytes), "\n")
-
-	if !strings.HasPrefix(lineSplit[0], "NAME") {
-		return ns, errors.New(fmt.Sprintf("Pod Response does not start with header string.\n Actual:\n%v ", string(bytes)))
-	}
-
-	pods := make([]Pod, 0)
-	for _, line := range lineSplit[1:] {
-		if len(strings.TrimSpace(line)) > 0 {
-			pod, err := parsePodLine(line)
-			if err != nil {
-				return ns, err
-			}
-			pod.Namespace = &ns
-			pods = append(pods, pod)
+func countReady(pod v1.Pod) int {
+	count := 0
+	for _, s := range pod.Status.ContainerStatuses {
+		if s.Ready {
+			count++
 		}
 	}
-
-	ns.Pods = pods
-	return ns, nil
+	return count
 }
 
-func parsePodLine(s string) (Pod, error) {
-	cleanSplit := cleanSplit(s)
-
-	if len(cleanSplit) != 5 {
-		return Pod{}, errors.New(fmt.Sprintf("Splitting pod info line `%v` brought %v values\n", s, len(cleanSplit)))
-	}
-
-	ready, total, err := splitReadyString(cleanSplit[1])
-	if err != nil {
-		return Pod{}, err
-	}
-	pod := Pod{
-		Name:     cleanSplit[0],
-		Ready:    ready,
-		Total:    total,
-		Status:   cleanSplit[2],
-		Restarts: cleanSplit[3],
-		Age:      cleanSplit[4],
-	}
-	return pod, nil
-}
-
-// Splits Ready section of the Pod info output which is in "2/2" or "1/2" format
-func splitReadyString(s string) (ready, total int, err error) {
-	split := strings.Split(s, "/")
-	ready, err = strconv.Atoi(split[0])
-	if err != nil {
-		return ready, total, errors.New(fmt.Sprintf("error converting Ready from string: '%v' '%v'", s, err))
-	}
-	total, err = strconv.Atoi(split[1])
-	if err != nil {
-		return ready, total, errors.New(fmt.Sprintf("error converting Total from string: '%v' '%v'", s, err))
-	}
-
-	return ready, total, nil
-}
-
-// Splits the output line removing blank spaces.
-func cleanSplit(input string) []string {
-	var cleanSplit []string
-
-	for _, v := range strings.Split(input, " ") {
-		v = strings.TrimSpace(v)
-		if len(v) != 0 {
-			cleanSplit = append(cleanSplit, v)
+func countRestarts(pod v1.Pod) int {
+	count := 0
+	for _, s := range pod.Status.ContainerStatuses {
+		if s.Ready {
+			count += int(s.RestartCount)
 		}
 	}
-
-	return cleanSplit
+	return count
 }
 
 func updateNamespaces(g *Group) ([]Namespace, error) {
@@ -137,7 +114,7 @@ func updateNamespaces(g *Group) ([]Namespace, error) {
 	// Get pod info in parallel
 	for i := range g.Namespaces {
 		go func(nsInfoCh chan<- Namespace, ctxName, nsName string) {
-			nsInfoCh <- getPods(ctxName, nsName)
+			nsInfoCh <- getPods(nsName)
 		}(nsInfoCh, g.Context, g.Namespaces[i])
 	}
 
@@ -161,4 +138,12 @@ func (ns *Namespace) sortPods() {
 	sort.Slice(ns.Pods, func(i, j int) bool {
 		return ns.Pods[i].Name < ns.Pods[j].Name
 	})
+}
+
+func buildConfigFromFlags(context, kubeconfigPath string) (*rest.Config, error) {
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
+		&clientcmd.ConfigOverrides{
+			CurrentContext: context,
+		}).ClientConfig()
 }

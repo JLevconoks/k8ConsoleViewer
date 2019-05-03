@@ -42,6 +42,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = NewK8ClientForContext(group.Context)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = termbox.Init()
 	if err != nil {
 		log.Panic("main.termbox.Init(): ", err)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/nsf/termbox-go"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -297,7 +298,7 @@ func (p *Pod) printPodInfo(y int, nameWidth, statusWidth int) {
 	printLine(p.Name, 3, y, fg, termbox.ColorDefault)
 	printLine(p.readyString(), nameWidth, y, fg, termbox.ColorDefault)
 	printLine(p.Status, nameWidth+ReadyColWidth, y, fg, termbox.ColorDefault)
-	printLine(p.Restarts, nameWidth+ReadyColWidth+statusWidth, y, fg, termbox.ColorDefault)
+	printLine(strconv.Itoa(p.Restarts), nameWidth+ReadyColWidth+statusWidth, y, fg, termbox.ColorDefault)
 	printLine(p.Age, nameWidth+ReadyColWidth+statusWidth+RestartsColWidth, y, fg, termbox.ColorDefault)
 }
 
