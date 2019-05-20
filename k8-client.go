@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
@@ -22,16 +21,12 @@ import (
 var k8client *kubernetes.Clientset
 
 func NewK8ClientForContext(context string) error {
-	var kubeconfig *string
 	configPath := filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return errors.New("No config found in ~/.kube")
 	}
-	kubeconfig = flag.String("kubeconfig", configPath, "(optional) absolute path to the kubeconfig file")
 
-	flag.Parse()
-
-	config, err := buildConfigFromFlags(context, *kubeconfig)
+	config, err := buildConfigFromFlags(context, configPath)
 	if err != nil {
 		return err
 	}
