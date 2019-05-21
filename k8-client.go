@@ -39,8 +39,8 @@ func NewK8ClientForContext(context string) error {
 	return nil
 }
 
-func getPods(namespace string) Namespace {
-	ns := Namespace{Name: namespace}
+func getPods(context, namespace string) Namespace {
+	ns := Namespace{Name: namespace, Context: context}
 
 	pods, err := k8client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -117,7 +117,7 @@ func updateNamespaces(g *Group) ([]Namespace, error) {
 	// Get pod info in parallel
 	for i := range g.Namespaces {
 		go func(nsInfoCh chan<- Namespace, ctxName, nsName string) {
-			nsInfoCh <- getPods(nsName)
+			nsInfoCh <- getPods(ctxName, nsName)
 		}(nsInfoCh, g.Context, g.Namespaces[i])
 	}
 

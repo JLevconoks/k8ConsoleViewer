@@ -21,7 +21,6 @@ const (
 
 type Gui struct {
 	group           string
-	context         string
 	namespaces      []Namespace
 	timeToExecute   time.Duration
 	height          int
@@ -49,9 +48,10 @@ type Positions struct {
 }
 
 type Namespace struct {
-	Name  string
-	Pods  []Pod
-	Error error
+	Name    string
+	Context string
+	Pods    []Pod
+	Error   error
 }
 
 type Pod struct {
@@ -105,7 +105,7 @@ func (gui *Gui) handleLeftArrow() {
 			gui.redrawAll()
 		}
 		gui.moveCursor(0, index+InfoAreaStart-gui.scrollOffset)
-	} else if gui.positions.hasNamespace(index) && !gui.nsCollapsed[gui.positions.namespaces[index].Name] {
+	} else if gui.positions.hasNamespace(index) && !gui.nsCollapsed[gui.positions.namespaces[index].displayName()] {
 		gui.collapseNamespace(index)
 	} else if gui.positions.hasPod(index) && gui.podExpanded[gui.positions.pods[index].Name] {
 		gui.mutex.Lock()
@@ -125,9 +125,9 @@ func (gui *Gui) handleRightArrow() {
 		gui.updatePositions()
 		gui.mutex.Unlock()
 		gui.redrawAll()
-	} else if gui.positions.hasNamespace(index) && gui.nsCollapsed[gui.positions.namespaces[index].Name] {
+	} else if gui.positions.hasNamespace(index) && gui.nsCollapsed[gui.positions.namespaces[index].displayName()] {
 		gui.mutex.Lock()
-		gui.nsCollapsed[gui.positions.namespaces[index].Name] = false
+		gui.nsCollapsed[gui.positions.namespaces[index].displayName()] = false
 		gui.updatePositions()
 		gui.mutex.Unlock()
 		gui.redrawAll()
@@ -136,7 +136,7 @@ func (gui *Gui) handleRightArrow() {
 
 func (gui *Gui) collapseNamespace(index int) {
 	gui.mutex.Lock()
-	gui.nsCollapsed[gui.positions.namespaces[index].Name] = true
+	gui.nsCollapsed[gui.positions.namespaces[index].displayName()] = true
 	gui.updatePositions()
 	gui.mutex.Unlock()
 	gui.redrawAll()
@@ -145,7 +145,7 @@ func (gui *Gui) collapseNamespace(index int) {
 func (gui *Gui) collapseAllNS() {
 	gui.mutex.Lock()
 	for _, ns := range gui.positions.namespaces {
-		gui.nsCollapsed[ns.Name] = true
+		gui.nsCollapsed[ns.displayName()] = true
 	}
 	gui.updatePositions()
 	gui.mutex.Unlock()
@@ -157,17 +157,13 @@ func (gui *Gui) collapseAllNS() {
 func (gui *Gui) expandAllNS() {
 	gui.mutex.Lock()
 	for _, ns := range gui.positions.namespaces {
-		gui.nsCollapsed[ns.Name] = false
+		gui.nsCollapsed[ns.displayName()] = false
 	}
 	gui.updatePositions()
 	gui.mutex.Unlock()
 
 	gui.cursorToStartPos()
 	gui.redrawAll()
-}
-
-func (gui *Gui) expandPod() {
-
 }
 
 func (gui *Gui) moveCursorDown() {
@@ -219,7 +215,7 @@ func (gui *Gui) adjustCursorPosition() {
 func (gui *Gui) printHeaders() {
 	printDefaultLine(fmt.Sprintf("%v    Time to execute: %v\n", time.Now().Format(time.RFC1123Z), gui.timeToExecute.String()), 0, 0)
 	printDefaultLine(fmt.Sprintf("Group: %v", gui.group), 0, 1)
-	printDefaultLine("NAMESPACE", 0, 3)
+	printDefaultLine("NAMESPACE / CONTEXT", 0, 3)
 	printDefaultLine("NAME", 3, 4)
 	printDefaultLine("READY", gui.nameWidth, 4)
 	printDefaultLine("STATUS", gui.nameWidth+ReadyColWidth, 4)
@@ -233,9 +229,9 @@ func (gui *Gui) printStatusArea() {
 	if gui.positions.hasNamespace(index) {
 		ns := gui.positions.namespaces[index]
 
-		all := fmt.Sprintf("kubectl --context %v -n %v get all", gui.context, ns.Name)
-		ingress := fmt.Sprintf("kubectl --context %v -n %v get ingress", gui.context, ns.Name)
-		events := fmt.Sprintf("kubectl --context %v -n %v get ev --sort-by=.lastTimestamp", gui.context, ns.Name)
+		all := fmt.Sprintf("kubectl --context %v -n %v get all", ns.Context, ns.Name)
+		ingress := fmt.Sprintf("kubectl --context %v -n %v get ingress", ns.Context, ns.Name)
+		events := fmt.Sprintf("kubectl --context %v -n %v get ev --sort-by=.lastTimestamp", ns.Context, ns.Name)
 
 		clearStatusArea()
 		printDefaultLine(all, 0, gui.height-4)
@@ -244,8 +240,8 @@ func (gui *Gui) printStatusArea() {
 	} else if gui.positions.hasPod(index) {
 		pod := gui.positions.pods[index]
 
-		podLog := fmt.Sprintf("kubectl --context %v -n %v logs %v", gui.context, pod.Namespace.Name, pod.Name)
-		exec := fmt.Sprintf("kubectl --context %v -n %v exec -it %v /bin/sh", gui.context, pod.Namespace.Name, pod.Name)
+		podLog := fmt.Sprintf("kubectl --context %v -n %v logs %v", pod.Namespace.Context, pod.Namespace.Name, pod.Name)
+		exec := fmt.Sprintf("kubectl --context %v -n %v exec -it %v /bin/sh", pod.Namespace.Context, pod.Namespace.Name, pod.Name)
 
 		clearStatusArea()
 		printDefaultLine(podLog, 0, gui.height-4)
@@ -253,8 +249,8 @@ func (gui *Gui) printStatusArea() {
 	} else if gui.positions.hasContainer(index) {
 		cont := gui.positions.containers[index]
 
-		contLog := fmt.Sprintf("kubectl --context %v -n %v logs %v --container %v", gui.context, cont.Pod.Namespace.Name, cont.Pod.Name, cont.Name)
-		exec := fmt.Sprintf("kubectl --context %v -n %v exec -it %v --container %v /bin/sh", gui.context, cont.Pod.Namespace.Name, cont.Pod.Name, cont.Name)
+		contLog := fmt.Sprintf("kubectl --context %v -n %v logs %v --container %v", cont.Pod.Namespace.Context, cont.Pod.Namespace.Name, cont.Pod.Name, cont.Name)
+		exec := fmt.Sprintf("kubectl --context %v -n %v exec -it %v --container %v /bin/sh", cont.Pod.Namespace.Context, cont.Pod.Namespace.Name, cont.Pod.Name, cont.Name)
 
 		clearStatusArea()
 		printDefaultLine(contLog, 0, gui.height-4)
@@ -297,8 +293,8 @@ func (gui *Gui) printMainInfo() {
 }
 
 func (gui *Gui) printNamespace(nsIndex, yPosition int) {
-	nsName := gui.positions.namespaces[nsIndex].Name
-	if gui.nsCollapsed[nsName] {
+	displayName := gui.positions.namespaces[nsIndex].displayName()
+	if gui.nsCollapsed[displayName] {
 		totalSum := 0
 		readySum := 0
 		for i := range gui.positions.namespaces[nsIndex].Pods {
@@ -309,10 +305,10 @@ func (gui *Gui) printNamespace(nsIndex, yPosition int) {
 		if totalSum != readySum {
 			fgColor = termbox.ColorRed
 		}
-		printLine(nsName, 0, yPosition, fgColor, termbox.ColorDefault)
+		printLine(displayName, 0, yPosition, fgColor, termbox.ColorDefault)
 		printLine(fmt.Sprintf("%v/%v", readySum, totalSum), gui.nameWidth, yPosition, fgColor, termbox.ColorDefault)
 	} else {
-		printDefaultLine(nsName, 0, yPosition)
+		printDefaultLine(displayName, 0, yPosition)
 	}
 }
 
@@ -332,11 +328,11 @@ func (gui *Gui) updatePositions() {
 
 	for nsIndex, ns := range gui.namespaces {
 		nsPositions[position] = &gui.namespaces[nsIndex]
-		if len(gui.namespaces[nsIndex].Name)+2 > nameWidth {
-			nameWidth = len(gui.namespaces[nsIndex].Name) + 2
+		if len(gui.namespaces[nsIndex].displayName())+2 > nameWidth {
+			nameWidth = len(gui.namespaces[nsIndex].displayName()) + 2
 		}
 		position++
-		if gui.nsCollapsed[ns.Name] {
+		if gui.nsCollapsed[ns.displayName()] {
 			continue
 		}
 		if len(gui.namespaces[nsIndex].Pods) == 0 {
@@ -431,6 +427,10 @@ func (gui *Gui) cursorToStartPos() {
 	gui.scrollOffset = 0
 	gui.mutex.Unlock()
 	gui.moveCursor(0, InfoAreaStart)
+}
+
+func (ns *Namespace) displayName() string {
+	return fmt.Sprintf("%v / %v", ns.Name, ns.Context)
 }
 
 func (p *Pod) readyString() string {

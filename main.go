@@ -71,7 +71,6 @@ func main() {
 
 	gui := Gui{
 		group:        group.Name,
-		context:      group.Context,
 		curTopBorder: TopAreaHeight + 1,
 		nameWidth:    NameColStartWidth,
 		statusWidth:  StatusColStartWidth,
