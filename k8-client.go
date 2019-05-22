@@ -18,22 +18,26 @@ import (
 	"time"
 )
 
-var k8client *kubernetes.Clientset
+var k8Clientsets map[string]*kubernetes.Clientset
 
-func NewK8ClientForContext(context string) error {
+func NewK8ClientSets(contexts map[string]struct{}) error {
 	configPath := filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return errors.New("No config found in ~/.kube")
 	}
 
-	config, err := buildConfigFromFlags(context, configPath)
-	if err != nil {
-		return err
-	}
+	k8Clientsets = make(map[string]*kubernetes.Clientset)
+	for context := range contexts {
+		config, err := buildConfigFromFlags(context, configPath)
+		if err != nil {
+			return err
+		}
 
-	k8client, err = kubernetes.NewForConfig(config)
-	if err != nil {
-		return err
+		k8client, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			return err
+		}
+		k8Clientsets[context] = k8client
 	}
 
 	return nil
@@ -42,7 +46,7 @@ func NewK8ClientForContext(context string) error {
 func getPods(context, namespace string) Namespace {
 	ns := Namespace{Name: namespace, Context: context}
 
-	pods, err := k8client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+	pods, err := k8Clientsets[context].CoreV1().Pods(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		ns.Error = err
 		return ns
@@ -111,14 +115,21 @@ func countRestarts(p *v1.Pod) int {
 func updateNamespaces(g *Group) ([]Namespace, error) {
 	var wg sync.WaitGroup
 
-	nsInfoCh := make(chan Namespace, len(g.Namespaces))
-	wg.Add(len(g.Namespaces))
+	nsTotal := 0
+
+	for i := range g.NsGroups {
+		nsTotal += len(g.NsGroups[i].Namespaces)
+	}
+	nsInfoCh := make(chan Namespace, nsTotal)
+	wg.Add(nsTotal)
 
 	// Get pod info in parallel
-	for i := range g.Namespaces {
-		go func(nsInfoCh chan<- Namespace, ctxName, nsName string) {
-			nsInfoCh <- getPods(ctxName, nsName)
-		}(nsInfoCh, g.Context, g.Namespaces[i])
+	for gi := range g.NsGroups {
+		for i := range g.NsGroups[gi].Namespaces {
+			go func(nsInfoCh chan<- Namespace, ctxName, nsName string) {
+				nsInfoCh <- getPods(ctxName, nsName)
+			}(nsInfoCh, g.NsGroups[gi].Context, g.NsGroups[gi].Namespaces[i])
+		}
 	}
 
 	// Wait for everything to finish and collect pod info into one slice

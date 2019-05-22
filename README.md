@@ -2,30 +2,11 @@ This is a small console app designed for monitoring pod statuses in multiple nam
 
 How to use:
 - Download latest release from [releases page](https://github.com/JLevconoks/k8ConsoleViewer/releases)
-- Create `groups.json` file alongside your download in the format below: 
-```json
-[
-  {
-    "id": 0,
-    "name": "jenkins",
-    "context": "tools",
-    "namespaces": [
-      "jenkins-slaves"
-    ]
-  },
-  {
-      "id": 1,
-      "name": "mynamespace",
-      "context": "dev",
-      "namespaces": [
-        "app1_namespace",
-        "app2_namespace"
-      ]
-  }
-]
-```
-- Run `./k8ConsoleViewer <id>` or `./k8ConsoleViewer <name>` based on the groups.json (Initial launch might be a bit slow due to kubectl response times)
+- Create `groups.json` file alongside your download in the format similar to `groups-sample.json` 
+
+- Run `./k8ConsoleViewer <id>` or `./k8ConsoleViewer <name>` based on the groups.json
 - Run `./k8ConsoleViewer` to view available groups 
+
 
 Symlink to /url/local/bin to launch it from anywhere 
 ```

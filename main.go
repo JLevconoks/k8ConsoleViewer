@@ -15,8 +15,13 @@ import (
 )
 
 type Group struct {
-	Id         int      `json:"id"`
-	Name       string   `json:"name"`
+	Id       int       `json:"id"`
+	Name     string    `json:"name"`
+	NsGroups []NsGroup `json:"nsGroups"`
+}
+
+type NsGroup struct {
+	Order      int      `json:"order"`
 	Context    string   `json:"context"`
 	Namespaces []string `json:"namespaces"`
 }
@@ -51,7 +56,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = NewK8ClientForContext(group.Context)
+	contextNameSet := make(map[string]struct{})
+
+	for i := range group.NsGroups {
+		contextNameSet[group.NsGroups[i].Context] = struct{}{}
+	}
+
+	err = NewK8ClientSets(contextNameSet)
 	if err != nil {
 		log.Fatal(err)
 	}

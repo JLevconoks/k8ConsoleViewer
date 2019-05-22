@@ -1,19 +1,42 @@
 [
   {
     "id": 0,
-    "name": "dev",
-    "context": "dev",
-    "namespaces": [
-      "app1_dev"
+    "name": "foo",
+    "nsGroups": [
+      {
+        "context": "dev",
+        "namespaces": [
+          "namespace1",
+          "namespace2"
+        ]
+      },
+      {
+        "context": "stage",
+        "namespaces": [
+          "namespace1",
+          "namespace2"
+        ]
+      }
     ]
   },
   {
-    "id": 1,
-    "name": "mynamespace",
-    "context": "dev",
-    "namespaces": [
-      "app1_namespace",
-      "app2_namespace"
+    "id": 0,
+    "name": "bar",
+    "nsGroups": [
+      {
+        "context": "dev",
+        "namespaces": [
+          "namespace123",
+          "namespace234"
+        ]
+      },
+      {
+        "context": "stage",
+        "namespaces": [
+          "namespace123",
+          "namespace234"
+        ]
+      }
     ]
   }
 ]
