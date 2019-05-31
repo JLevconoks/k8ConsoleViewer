@@ -2,42 +2,30 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/nsf/termbox-go"
+	"github.com/JLevconoks/k8ConsoleViewer/version"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
-	"time"
 )
 
-type Group struct {
-	Id       int       `json:"id"`
-	Name     string    `json:"name"`
-	NsGroups []NsGroup `json:"nsGroups"`
-}
-
-type NsGroup struct {
-	Order      int      `json:"order"`
-	Context    string   `json:"context"`
-	Namespaces []string `json:"namespaces"`
-}
-
 func main() {
-	appDir, err := getAppDir()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	groups, err := readGroups(appDir + "/groups.json")
+	groups, err := readConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	args := os.Args
+	for _, s := range args {
+		if s == "-v" || s == "-version" || s == "--version" {
+			version.PrintVersion()
+			os.Exit(0)
+		}
+	}
 
 	if len(args) < 2 {
 		fmt.Println("Group name is not provided")
@@ -45,135 +33,70 @@ func main() {
 		os.Exit(1)
 	}
 
-	userInput := args[1]
-
-	group, err := getGroup(userInput, groups)
+	group, err := getGroup(args[1], groups)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	contextNameSet := make(map[string]struct{})
-
 	for i := range group.NsGroups {
 		contextNameSet[group.NsGroups[i].Context] = struct{}{}
 	}
 
-	err = NewK8ClientSets(contextNameSet)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = termbox.Init()
-	if err != nil {
-		log.Panic("main.termbox.Init(): ", err)
-	}
-	defer func() {
-		clear()
-		termbox.Close()
-	}()
-
-	//logToFile(appDir)
-
-	termbox.SetInputMode(termbox.InputEsc)
-
-	gui := Gui{
-		group:        group.Name,
-		curTopBorder: TopAreaHeight + 1,
-		nameWidth:    NameColStartWidth,
-		statusWidth:  StatusColStartWidth,
-		nsCollapsed:  make(map[string]bool),
-		podExpanded:  make(map[string]bool),
-	}
-	gui.updateWindowSize()
-
-	updateGuiCh := make(chan struct{})
-
-	go func() {
-		for {
-			startTime := time.Now()
-			namespaceInfos, _ := updateNamespaces(group)
-			endTime := time.Now()
-
-			gui.mutex.Lock()
-			gui.namespaces = namespaceInfos
-			gui.timeToExecute = endTime.Sub(startTime)
-			gui.updatePositions()
-			gui.mutex.Unlock()
-
-			updateGuiCh <- struct{}{}
-
-			time.Sleep(5 * time.Second)
-		}
-	}()
-
-	go func() {
-		for range updateGuiCh {
-			gui.redrawAll()
-		}
-	}()
-
-	updateGuiCh <- struct{}{}
-
-mainEventLoop:
-	for {
-		switch ev := termbox.PollEvent(); ev.Type {
-		case termbox.EventKey:
-			switch ev.Key {
-			case termbox.KeyEsc, termbox.KeyCtrlC:
-				break mainEventLoop
-			case termbox.KeyArrowDown:
-				gui.moveCursorDown()
-			case termbox.KeyArrowUp:
-				gui.moveCursorUp()
-			case termbox.KeyArrowLeft:
-				gui.handleLeftArrow()
-			case termbox.KeyArrowRight:
-				gui.handleRightArrow()
-			}
-			switch ev.Ch {
-			case 'c':
-				gui.collapseAllNS()
-			case 'e':
-				gui.expandAllNS()
-			}
-		case termbox.EventResize:
-			gui.updateWindowSize()
-			updateGuiCh <- struct{}{}
-		case termbox.EventError:
-			panic(ev.Err)
-		}
-	}
+	//k8Client, err := NewK8ClientSets(contextNameSet)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	logToFile()
+	k8Client := FakeK8Client{}
+	app := NewApp(k8Client)
+	app.Run(group)
 }
 
-func readGroups(filepath string) ([]Group, error) {
-	_, err := os.Stat(filepath)
+func logToFile() {
+	file, err := os.OpenFile("/Users/jle40/go/src/github.com/JLevconoks/k8ConsoleViewer/log.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		return nil, fmt.Errorf("'%v' does not exist: %v\n", filepath, err)
+		log.Fatal("err")
 	}
 
-	file, err := os.Open(filepath)
+	log.SetOutput(file)
+}
+
+func readConfig() ([]Group, error) {
+	//appDir, err := getAppDir()
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "Error reading config")
+	//}
+
+	//configFilePath := appDir + "/groups.json"
+	configFilePath := "/Users/jle40/Tools/k8ConsoleViewer/groups.json"
+	_, err := os.Stat(configFilePath)
+	if err != nil {
+		return nil, errors.Wrap(err, "File does not exist")
+	}
+
+	file, err := os.Open(configFilePath)
 	defer func() {
 		err := file.Close()
 		if err != nil {
 			panic(fmt.Sprint("Error closing groups file: ", err))
+
 		}
 	}()
-
 	if err != nil {
-		return nil, errors.New("Error opening file: " + err.Error())
+		return nil, errors.Wrap(err, "Error opening file")
 	}
 
 	bytes, err := ioutil.ReadAll(file)
-
 	if err != nil {
-		return nil, errors.New("Error reading file: " + err.Error())
+		return nil, errors.Wrap(err, "Error reading file")
 	}
 
 	groups := make([]Group, 0)
 	err = json.Unmarshal(bytes, &groups)
 
 	if err != nil {
-		return nil, errors.New("Error unmarshalling file " + err.Error())
+		return nil, errors.Wrap(err, "Error unmarshalling file")
 	}
 
 	sort.Slice(groups, func(i, j int) bool { return groups[i].Id < groups[j].Id })
@@ -188,46 +111,36 @@ func printGroups(groups []Group) {
 	}
 }
 
-func getGroup(param string, groups []Group) (*Group, error) {
-
+func getGroup(param string, groups []Group) (Group, error) {
 	id, err := strconv.Atoi(param)
 
 	if err != nil {
 		for k := range groups {
 			if groups[k].Name == param {
-				return &groups[k], nil
+				return groups[k], nil
 			}
 		}
 
-		return nil, fmt.Errorf("group '%v' not found", param)
+		return Group{}, errors.Errorf("group '%v' not found", param)
 	}
 
 	for k := range groups {
 		if groups[k].Id == id {
-			return &groups[k], nil
+			return groups[k], nil
 		}
 	}
 
-	return nil, fmt.Errorf("ID '%v' not found", id)
-}
-
-func logToFile(appDir string) {
-	file, err := os.OpenFile(appDir+"/log.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatal("err")
-	}
-
-	log.SetOutput(file)
+	return Group{}, errors.Errorf("ID '%v' not found", id)
 }
 
 func getAppDir() (string, error) {
 	s, err := os.Executable()
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "Error in os.Executable() %v", s)
 	}
 	symlink, err := filepath.EvalSymlinks(s)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "Error in filepath.EvalSymlinks() %v", s)
 	}
 
 	return filepath.Dir(symlink), nil
