@@ -3,9 +3,11 @@ go:
 - 1.13.x
 script:
   - go test -v ./...
-  - echo "-----------"
+  - export buildNumber=$(git describe --tags)
+  - export buildTime=$(date)
   - env
-  - echo "-----------"
+  - echo $buildNumber
+  - echo $buildTime
   - GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" .
 deploy:
   provider: releases
