@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gdamore/tcell"
 	v1 "k8s.io/api/core/v1"
@@ -15,9 +16,9 @@ import (
 
 const (
 	NamespaceXOffset           = 0
-	NamespaceErrorXOffset      = 3
-	PodXOffset                 = 3
-	ContainerXOffset           = 6
+	NamespaceErrorXOffset      = 2
+	PodXOffset                 = 2
+	ContainerXOffset           = 4
 	ColumnSpacing              = 2
 	NameColumnDefaultWidth     = 25 + ColumnSpacing
 	ReadyColumnDefaultWidth    = 5 + ColumnSpacing
@@ -355,7 +356,9 @@ func (gui *Gui) handlePageUp() {
 func (gui *Gui) handlePageDown() {
 	tempCursorPos := gui.mainFrame.cursorY
 	gui.mainFrame.moveCursor(gui.s, 2*gui.mainFrame.height-gui.mainFrame.cursorY-1)
-	gui.mainFrame.cursorY = tempCursorPos
+	if gui.mainFrame.cursorY+gui.mainFrame.scrollYOffset != len(gui.mainFrame.positions)-1 {
+		gui.mainFrame.cursorY = tempCursorPos
+	}
 	gui.mainFrame.updateCursor(gui.s)
 	gui.updateStatusBar()
 }
@@ -399,7 +402,6 @@ func (f *Frame) moveCursor(s tcell.Screen, ny int) {
 	newOffset := f.scrollYOffset
 	if ny > 0 {
 		// Moving down
-
 		if f.cursorY+f.scrollYOffset+ny > len(f.positions)-1 {
 			// if we are outside positions, change to max available movement
 			ny = len(f.positions) - 1 - f.cursorY - f.scrollYOffset
@@ -476,10 +478,10 @@ func (f *Frame) updateNamespaces(podListResults []PodListResult) {
 	}
 
 	sort.Slice(newNamespaces, func(i, j int) bool {
-		if newNamespaces[i].name > newNamespaces[j].name {
+		if newNamespaces[i].context > newNamespaces[j].context {
 			return true
 		}
-		if newNamespaces[i].name < newNamespaces[j].name {
+		if newNamespaces[i].context < newNamespaces[j].context {
 			return false
 		}
 		return newNamespaces[i].name < newNamespaces[j].name
@@ -672,6 +674,14 @@ func toNamespace(plr *PodListResult) Namespace {
 	ns.nsError = NamespaceError{
 		error:     plr.error,
 		namespace: &ns,
+	}
+
+	// TODO: See if it is worth making something like NamespaceMessage instead of using namespace error.
+	if len(plr.Items) == 0 {
+		ns.nsError = NamespaceError{
+			error:     errors.New("No resources found."),
+			namespace: &ns,
+		}
 	}
 
 	pods := make([]Pod, 0)

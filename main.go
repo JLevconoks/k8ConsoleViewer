@@ -43,34 +43,36 @@ func main() {
 		contextNameSet[group.NsGroups[i].Context] = struct{}{}
 	}
 
-	//k8Client, err := NewK8ClientSets(contextNameSet)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	logToFile()
-	k8Client := FakeK8Client{}
+	k8Client, err := NewK8ClientSets(contextNameSet)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//logToFile()
 	app := NewApp(k8Client)
 	app.Run(group)
 }
 
 func logToFile() {
-	file, err := os.OpenFile("/Users/jle40/go/src/github.com/JLevconoks/k8ConsoleViewer/log.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	appDir, err := getAppDir()
 	if err != nil {
-		log.Fatal("err")
+		log.Fatal(err)
+	}
+	file, err := os.OpenFile(appDir+"/log.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	log.SetOutput(file)
 }
 
 func readConfig() ([]Group, error) {
-	//appDir, err := getAppDir()
-	//if err != nil {
-	//	return nil, errors.Wrap(err, "Error reading config")
-	//}
+	appDir, err := getAppDir()
+	if err != nil {
+		return nil, errors.Wrap(err, "Error reading config")
+	}
 
-	//configFilePath := appDir + "/groups.json"
-	configFilePath := "/Users/jle40/Tools/k8ConsoleViewer/groups.json"
-	_, err := os.Stat(configFilePath)
+	configFilePath := appDir + "/groups.json"
+	_, err = os.Stat(configFilePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "File does not exist")
 	}
