@@ -1,8 +1,11 @@
 language: go
 go:
-- 1.11.x
+- 1.13.x
 script:
   - go test -v ./...
+  - echo "-----------"
+  - env
+  - echo "-----------"
   - GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" .
 deploy:
   provider: releases
