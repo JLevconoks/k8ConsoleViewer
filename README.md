@@ -7,6 +7,8 @@ This is a small console app designed for monitoring pod statuses in multiple nam
 - `right` - expand item
 - `PgUp` - scroll up a page
 - `PgDn` - scroll down a page
+- `Home` - scroll to the top
+- `End` - scroll to the end
 
 ### How to use:
 - Download latest release from [releases page](https://github.com/JLevconoks/k8ConsoleViewer/releases)

@@ -92,6 +92,10 @@ func (app *App) Run(group Group) {
 					gui.handlePageUp()
 				case tcell.KeyPgDn:
 					gui.handlePageDown()
+				case tcell.KeyHome:
+					gui.handleHomeKey()
+				case tcell.KeyEnd:
+					gui.handleEndKey()
 				}
 				switch ev.Rune() {
 				case 'c':

@@ -363,6 +363,14 @@ func (gui *Gui) handlePageDown() {
 	gui.updateStatusBar()
 }
 
+func (gui *Gui) handleHomeKey() {
+	gui.mainFrame.moveCursor(gui.s, -len(gui.mainFrame.positions)-1)
+}
+
+func (gui *Gui) handleEndKey() {
+	gui.mainFrame.moveCursor(gui.s, len(gui.mainFrame.positions)-1)
+}
+
 func (gui *Gui) updateStatusBar() {
 	if len(gui.mainFrame.positions) == 0 {
 		//Special case triggered by resize event being sent on app load and before positions were calculated for namespaces

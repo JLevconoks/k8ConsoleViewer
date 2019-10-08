@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-version=local-$(git rev-parse HEAD)
+version=local-$(git describe --tags)
 time=$(date)
 echo "$version"
 go test .
