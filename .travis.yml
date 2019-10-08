@@ -7,7 +7,6 @@ script:
   - export buildTime=$(date)
   - echo "Building with version $buildNumber / $buildTime"
   - GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X 'github.com/JLevconoks/k8ConsoleViewer/version.BuildTime=$buildTime' -X 'github.com/JLevconoks/k8ConsoleViewer/version.BuildVersion=$buildNumber'" .
-  - ./k8ConsoleViewer --version
 deploy:
   provider: releases
   api_key:
