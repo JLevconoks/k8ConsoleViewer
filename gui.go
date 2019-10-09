@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"github.com/gdamore/tcell"
 	v1 "k8s.io/api/core/v1"
@@ -17,6 +16,7 @@ import (
 const (
 	NamespaceXOffset           = 0
 	NamespaceErrorXOffset      = 2
+	NamespaceMessageXOffset    = 2
 	PodXOffset                 = 2
 	ContainerXOffset           = 4
 	ColumnSpacing              = 2
@@ -36,6 +36,7 @@ const (
 	TypePod
 	TypeContainer
 	TypeNamespaceError
+	TypeNamespaceMessage
 )
 
 type Item interface {
@@ -49,6 +50,7 @@ type Namespace struct {
 	context    string
 	pods       []Pod
 	nsError    NamespaceError
+	nsMessage  NamespaceMessage
 	isExpanded bool
 }
 
@@ -76,6 +78,12 @@ type Container struct {
 
 type NamespaceError struct {
 	error      error
+	isExpanded bool
+	namespace  *Namespace
+}
+
+type NamespaceMessage struct {
+	message    string
 	isExpanded bool
 	namespace  *Namespace
 }
@@ -134,6 +142,18 @@ func (nse NamespaceError) Expanded(b bool) {
 
 func (nse NamespaceError) IsExpanded() bool {
 	return nse.isExpanded
+}
+
+func (nsm NamespaceMessage) Type() Type {
+	return TypeNamespaceMessage
+}
+
+func (nsm NamespaceMessage) Expanded(b bool) {
+	nsm.isExpanded = b
+}
+
+func (nsm NamespaceMessage) IsExpanded() bool {
+	return nsm.isExpanded
 }
 
 type StringItem struct {
@@ -516,6 +536,9 @@ func (f *Frame) updatePositions() {
 	for nsIndex := range f.nsItems {
 		positions = append(positions, &f.nsItems[nsIndex])
 		if f.nsItems[nsIndex].isExpanded {
+			if f.nsItems[nsIndex].nsMessage.message != "" {
+				positions = append(positions, &(f.nsItems[nsIndex].nsMessage))
+			}
 			if f.nsItems[nsIndex].nsError.error != nil {
 				positions = append(positions, &(f.nsItems[nsIndex].nsError))
 			}
@@ -541,6 +564,8 @@ func (f *Frame) updateInfoFrame(s tcell.Screen) {
 		switch position.Type() {
 		case TypeNamespace:
 			f.printNamespace(s, position.(*Namespace), posIndex)
+		case TypeNamespaceMessage:
+			f.printNamespaceMessage(s, position.(*NamespaceMessage), posIndex)
 		case TypeNamespaceError:
 			f.printNamespaceError(s, position.(*NamespaceError), posIndex)
 		case TypePod:
@@ -574,6 +599,10 @@ func (f *Frame) printNamespace(s tcell.Screen, ns *Namespace, yPos int) {
 
 func (f *Frame) printNamespaceError(s tcell.Screen, nse *NamespaceError, yPos int) {
 	drawS(s, nse.error.Error(), NamespaceErrorXOffset, f.y+yPos, f.width, tcell.StyleDefault.Foreground(tcell.ColorYellow))
+}
+
+func (f *Frame) printNamespaceMessage(s tcell.Screen, nse *NamespaceMessage, yPos int) {
+	drawS(s, nse.message, NamespaceMessageXOffset, f.y+yPos, f.width, tcell.StyleDefault.Foreground(tcell.ColorYellow))
 }
 
 func (f *Frame) printPod(s tcell.Screen, p *Pod, yPos int) {
@@ -650,6 +679,10 @@ func (f *Frame) updatePodHeader(s tcell.Screen) {
 }
 
 func (f *Frame) updateCursor(s tcell.Screen) {
+	if f.cursorY+f.scrollYOffset > len(f.positions)-1 {
+		diff := f.cursorY + f.scrollYOffset - (len(f.positions) - 1)
+		f.moveCursor(s, -diff)
+	}
 	s.ShowCursor(f.x+f.cursorX, f.y+f.cursorY)
 	s.Show()
 }
@@ -684,10 +717,9 @@ func toNamespace(plr *PodListResult) Namespace {
 		namespace: &ns,
 	}
 
-	// TODO: See if it is worth making something like NamespaceMessage instead of using namespace error.
 	if len(plr.Items) == 0 {
-		ns.nsError = NamespaceError{
-			error:     errors.New("No resources found."),
+		ns.nsMessage = NamespaceMessage{
+			message:   "No resources found.",
 			namespace: &ns,
 		}
 	}

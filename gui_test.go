@@ -93,6 +93,13 @@ func TestMoveCursor(t *testing.T) {
 			expectedCurY:   0,
 			expectedOffset: 0,
 		},
+		{
+			name:           "move_up_when_cursor_is_outside_available_positions",
+			frame:          Frame{height: 10, cursorY: 10, scrollYOffset: 15, nsItems: fakeNamespaces(20)},
+			moveBy:         -15,
+			expectedCurY:   0,
+			expectedOffset: 10,
+		},
 	}
 
 	for index, tc := range testTable {
