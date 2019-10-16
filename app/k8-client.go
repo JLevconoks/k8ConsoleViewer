@@ -1,6 +1,7 @@
-package main
+package app
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +22,11 @@ type Client struct {
 
 type K8Client interface {
 	podLists(group Group) []PodListResult
+}
+
+type getPodJob struct {
+	context   string
+	namespace string
 }
 
 type PodListResult struct {
@@ -55,24 +61,26 @@ func NewK8ClientSets(contexts map[string]struct{}) (Client, error) {
 
 func (k8Client Client) podLists(group Group) []PodListResult {
 	var wg sync.WaitGroup
+	resultCh := make(chan PodListResult)
+	jobCh := make(chan getPodJob)
+	workerCount := 3
 
-	nsTotal := 0
-
-	for i := range group.NsGroups {
-		nsTotal += len(group.NsGroups[i].Namespaces)
+	wg.Add(workerCount)
+	for i := 0; i < workerCount; i++ {
+		go getPods(k8Client, jobCh, resultCh, &wg)
 	}
-	resultCh := make(chan PodListResult, nsTotal)
-	wg.Add(nsTotal)
 
-	for gIndex := range group.NsGroups {
-		for nsIndex := range group.NsGroups[gIndex].Namespaces {
-			go func(ctxName, nsName string) {
-				podList, err := k8Client.k8ClientSets[ctxName].CoreV1().Pods(nsName).List(metav1.ListOptions{})
-				resultCh <- PodListResult{ctxName, nsName, *podList, err}
-			}(group.NsGroups[gIndex].Context, group.NsGroups[gIndex].Namespaces[nsIndex])
+	go func() {
+		for gIndex := range group.NsGroups {
+			for nsIndex := range group.NsGroups[gIndex].Namespaces {
+				jobCh <- getPodJob{
+					context:   group.NsGroups[gIndex].Context,
+					namespace: group.NsGroups[gIndex].Namespaces[nsIndex],
+				}
+			}
 		}
-	}
-
+		close(jobCh)
+	}()
 	go func() {
 		wg.Wait()
 		close(resultCh)
@@ -81,9 +89,21 @@ func (k8Client Client) podLists(group Group) []PodListResult {
 	podListResults := make([]PodListResult, 0)
 	for podListResult := range resultCh {
 		podListResults = append(podListResults, podListResult)
-		wg.Done()
 	}
 	return podListResults
+}
+
+func getPods(k8Client Client, jobCh <-chan getPodJob, resultCh chan<- PodListResult, wg *sync.WaitGroup) {
+	for job := range jobCh {
+		podList, err := k8Client.k8ClientSets[job.context].CoreV1().Pods(job.namespace).List(metav1.ListOptions{})
+		resultCh <- PodListResult{job.context, job.namespace, *podList, err}
+	}
+	wg.Done()
+}
+
+func (k8Client Client) listNamespaces(context string) (*v1.NamespaceList, error) {
+	fmt.Printf("Getting namespace list for context: %v \n", context)
+	return k8Client.k8ClientSets[context].CoreV1().Namespaces().List(metav1.ListOptions{})
 }
 
 func buildConfigFromFlags(context, kubeconfigPath string) (*rest.Config, error) {
