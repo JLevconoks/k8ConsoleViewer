@@ -52,16 +52,17 @@ func (n *Namespace) DisplayName() string {
 }
 
 type Pod struct {
-	name         string
-	ready        int
-	total        int
-	status       string
-	restarts     int
-	age          string
-	creationTime time.Time
-	containers   []Container
-	isExpanded   bool
-	namespace    *Namespace
+	name           string
+	deploymentName string
+	ready          int
+	total          int
+	status         string
+	restarts       int
+	age            string
+	creationTime   time.Time
+	containers     []Container
+	isExpanded     bool
+	namespace      *Namespace
 }
 
 func (p *Pod) Type() Type {

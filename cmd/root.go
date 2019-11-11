@@ -14,8 +14,8 @@ var rootCmd = &cobra.Command{
 }
 
 var (
-	buildVersion string = ""
-	buildTime    string = ""
+	buildVersion = ""
+	buildTime    = ""
 	namespace    string
 	context      string
 )
