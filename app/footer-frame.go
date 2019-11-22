@@ -9,25 +9,25 @@ type FooterFrame struct {
 	x, y          int
 	width, height int
 	lines         []string
-	statusBar     StringItem
+	statusBar     *StringItem
 	statusBarCh   chan string
 }
 
-func NewFooterFrame(s tcell.Screen) (frame FooterFrame) {
+func NewFooterFrame(s tcell.Screen) *FooterFrame {
 	winWidth, winHeight := s.Size()
 	sbCh := make(chan string)
-	frame = FooterFrame{
+	frame := FooterFrame{
 		x:           0,
 		y:           winHeight - FooterFrameHeight,
 		width:       winWidth,
 		height:      FooterFrameHeight,
 		lines:       make([]string, FooterFrameHeight-1),
-		statusBar:   StringItem{0, winHeight - 1, 0, ""},
+		statusBar:   &StringItem{x: 0, y: winHeight - 1, length: 0, value: ""},
 		statusBarCh: sbCh,
 	}
 	frame.lines[0] = strings.Repeat("-", 25)
 	frame.listenForStatusMessages(s)
-	return frame
+	return &frame
 }
 
 func (ff *FooterFrame) listenForStatusMessages(s tcell.Screen) {
@@ -63,7 +63,7 @@ func (ff *FooterFrame) update(s tcell.Screen) {
 
 func (ff *FooterFrame) resize(s tcell.Screen, winWidth, winHeight int) {
 	ff.width = winWidth
-	ff.height = winHeight - FooterFrameHeight
+	ff.y = winHeight - FooterFrameHeight
 	ff.statusBar.y = winHeight - 1
 	ff.update(s)
 }

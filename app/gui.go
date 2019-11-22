@@ -29,9 +29,8 @@ type Gui struct {
 	execLabel   StringItem
 	execTime    StringItem
 	groupName   StringItem
-	mainFrame   InfoFrame
-	footerFrame FooterFrame
-	statusBar   StringItem
+	mainFrame   *InfoFrame
+	footerFrame *FooterFrame
 	statusBarCh chan string
 }
 

@@ -27,12 +27,12 @@ type InfoFrame struct {
 	ageColWidth      int
 }
 
-func NewInfoFrame(winWidth, winHeight int) InfoFrame {
+func NewInfoFrame(winWidth, winHeight int) *InfoFrame {
 	nsHeader := StringItem{NamespaceXOffset, 3, 0, "NAMESPACE / CONTEXT"}
 	podHeader := StringItem{PodXOffset, 4, 0, "NAME  READY  STATUS  RESTARTS  AGE"}
 	width, height := calcInfoFrameSize(winWidth, winHeight)
 
-	return InfoFrame{
+	return &InfoFrame{
 		x:                0,
 		y:                MainFrameStartY,
 		width:            width,
