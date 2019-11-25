@@ -211,6 +211,7 @@ func toPod(p v1.Pod, parent *Namespace) Pod {
 	pod.restarts = restarts
 	pod.creationTime = creationTime
 	pod.age = translateTimestampSince(creationTime)
+	pod.deploymentName = p.Labels["deployment"]
 
 	containers := make([]Container, 0)
 	for _, c := range p.Status.ContainerStatuses {
