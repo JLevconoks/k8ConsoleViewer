@@ -6,6 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/kubernetes/pkg/util/node"
+	"sort"
 	"strings"
 	"time"
 )
@@ -13,7 +14,8 @@ import (
 type Type int
 
 const (
-	TypeNamespace Type = iota
+	TypeNamespace Type = iota + 1
+	TypeDeployment
 	TypePod
 	TypeContainer
 	TypeNamespaceError
@@ -27,12 +29,12 @@ type Item interface {
 }
 
 type Namespace struct {
-	name       string
-	context    string
-	pods       []Pod
-	nsError    NamespaceError
-	nsMessage  NamespaceMessage
-	isExpanded bool
+	name        string
+	context     string
+	deployments []Deployment
+	nsError     NamespaceError
+	nsMessage   NamespaceMessage
+	isExpanded  bool
 }
 
 func (n *Namespace) Type() Type {
@@ -51,18 +53,47 @@ func (n *Namespace) DisplayName() string {
 	return fmt.Sprintf("%v / %v", n.name, n.context)
 }
 
+type Deployment struct {
+	name       string
+	pods       []Pod
+	isExpanded bool
+	namespace  *Namespace
+}
+
+func (d *Deployment) Type() Type {
+	return TypeDeployment
+}
+
+func (d *Deployment) Expanded(b bool) {
+	d.isExpanded = b
+}
+
+func (d *Deployment) IsExpanded() bool {
+	return d.isExpanded
+}
+
+func (d *Deployment) countReadyPods() (ready int) {
+	ready = 0
+
+	for pIndex := range d.pods {
+		if d.pods[pIndex].ready == d.pods[pIndex].total {
+			ready++
+		}
+	}
+	return ready
+}
+
 type Pod struct {
-	name           string
-	deploymentName string
-	ready          int
-	total          int
-	status         string
-	restarts       int
-	age            string
-	creationTime   time.Time
-	containers     []Container
-	isExpanded     bool
-	namespace      *Namespace
+	name         string
+	ready        int
+	total        int
+	status       string
+	restarts     int
+	age          string
+	creationTime time.Time
+	containers   []Container
+	isExpanded   bool
+	deployment   *Deployment
 }
 
 func (p *Pod) Type() Type {
@@ -191,17 +222,50 @@ func toNamespace(plr *PodListResult) Namespace {
 		}
 	}
 
-	pods := make([]Pod, 0)
-	for _, p := range plr.Items {
-		pods = append(pods, toPod(p, &ns))
-	}
-
-	ns.pods = pods
+	ns.deployments = toDeployments(plr.Items, &ns)
 	return ns
 }
 
-func toPod(p v1.Pod, parent *Namespace) Pod {
-	pod := Pod{name: p.Name, namespace: parent}
+func toDeployments(pods []v1.Pod, parent *Namespace) []Deployment {
+	deploymentMap := make(map[string]Deployment)
+
+	for _, pod := range pods {
+		deploymentName := pod.Labels["deployment"]
+		if deploymentName == "" {
+			deploymentName = "_"
+		}
+
+		d, ok := deploymentMap[deploymentName]
+		if !ok {
+			d = Deployment{
+				name:       deploymentName,
+				pods:       make([]Pod, 0),
+				isExpanded: false,
+				namespace:  parent,
+			}
+		}
+
+		d.pods = append(d.pods, toPod(pod, &d))
+		deploymentMap[deploymentName] = d
+	}
+
+	deployments := make([]Deployment, len(deploymentMap))
+
+	index := 0
+	for _, d := range deploymentMap {
+		deployments[index] = d
+		index++
+	}
+
+	sort.Slice(deployments, func(i, j int) bool {
+		return deployments[i].name < deployments[j].name
+	})
+
+	return deployments
+}
+
+func toPod(p v1.Pod, parent *Deployment) Pod {
+	pod := Pod{name: p.Name, deployment: parent}
 
 	status, ready, total, restarts, creationTime := podStats(&p)
 
@@ -211,7 +275,6 @@ func toPod(p v1.Pod, parent *Namespace) Pod {
 	pod.restarts = restarts
 	pod.creationTime = creationTime
 	pod.age = translateTimestampSince(creationTime)
-	pod.deploymentName = p.Labels["deployment"]
 
 	containers := make([]Container, 0)
 	for _, c := range p.Status.ContainerStatuses {

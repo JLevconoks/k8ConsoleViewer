@@ -80,12 +80,18 @@ func (f *InfoFrame) updatePositions() {
 			if f.nsItems[nsIndex].nsError.error != nil {
 				positions = append(positions, &(f.nsItems[nsIndex].nsError))
 			}
-			for pIndex := range f.nsItems[nsIndex].pods {
-				positions = append(positions, &(f.nsItems[nsIndex].pods[pIndex]))
 
-				if f.nsItems[nsIndex].pods[pIndex].isExpanded {
-					for pContainer := range f.nsItems[nsIndex].pods[pIndex].containers {
-						positions = append(positions, &(f.nsItems[nsIndex].pods[pIndex].containers[pContainer]))
+			for dIndex := range f.nsItems[nsIndex].deployments {
+				positions = append(positions, &(f.nsItems[nsIndex].deployments[dIndex]))
+				if f.nsItems[nsIndex].deployments[dIndex].isExpanded {
+					for pIndex := range f.nsItems[nsIndex].deployments[dIndex].pods {
+						positions = append(positions, &(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex]))
+
+						if f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].isExpanded {
+							for pContainer := range f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].containers {
+								positions = append(positions, &(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].containers[pContainer]))
+							}
+						}
 					}
 				}
 			}
@@ -106,21 +112,28 @@ func (f *InfoFrame) updatePodHeader(s tcell.Screen) {
 			f.nameColWidth = ColumnSpacing + len(f.nsItems[nsIndex].DisplayName())
 		}
 		if f.nsItems[nsIndex].IsExpanded() {
-			for pIndex, _ := range f.nsItems[nsIndex].pods {
-				if f.nameColWidth < ColumnSpacing+len(f.nsItems[nsIndex].pods[pIndex].name) {
-					f.nameColWidth = ColumnSpacing + len(f.nsItems[nsIndex].pods[pIndex].name)
+			for dIndex := range f.nsItems[nsIndex].deployments {
+				if f.nameColWidth < DeploymentXOffset+ColumnSpacing+len(f.nsItems[nsIndex].deployments[dIndex].name) {
+					f.nameColWidth = DeploymentXOffset + ColumnSpacing + len(f.nsItems[nsIndex].deployments[dIndex].name)
 				}
-				if f.readyColWidth < ColumnSpacing+len(f.nsItems[nsIndex].pods[pIndex].ReadyString()) {
-					f.readyColWidth = ColumnSpacing + len(f.nsItems[nsIndex].pods[pIndex].ReadyString())
-				}
-				if f.statusColWidth < ColumnSpacing+len(f.nsItems[nsIndex].pods[pIndex].status) {
-					f.statusColWidth = ColumnSpacing + len(f.nsItems[nsIndex].pods[pIndex].status)
-				}
-				if f.restartsColWidth < ColumnSpacing+len(strconv.Itoa(f.nsItems[nsIndex].pods[pIndex].restarts)) {
-					f.restartsColWidth = ColumnSpacing + len(strconv.Itoa(f.nsItems[nsIndex].pods[pIndex].restarts))
-				}
-				if f.ageColWidth < ColumnSpacing+len(f.nsItems[nsIndex].pods[pIndex].age) {
-					f.ageColWidth = ColumnSpacing + len(f.nsItems[nsIndex].pods[pIndex].age)
+				if f.nsItems[nsIndex].deployments[dIndex].isExpanded {
+					for pIndex := range f.nsItems[nsIndex].deployments[dIndex].pods {
+						if f.nameColWidth < ColumnSpacing+len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].name) {
+							f.nameColWidth = ColumnSpacing + len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].name)
+						}
+						if f.readyColWidth < ColumnSpacing+len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].ReadyString()) {
+							f.readyColWidth = ColumnSpacing + len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].ReadyString())
+						}
+						if f.statusColWidth < ColumnSpacing+len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].status) {
+							f.statusColWidth = ColumnSpacing + len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].status)
+						}
+						if f.restartsColWidth < ColumnSpacing+len(strconv.Itoa(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].restarts)) {
+							f.restartsColWidth = ColumnSpacing + len(strconv.Itoa(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].restarts))
+						}
+						if f.ageColWidth < ColumnSpacing+len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].age) {
+							f.ageColWidth = ColumnSpacing + len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].age)
+						}
+					}
 				}
 			}
 		}
@@ -147,6 +160,8 @@ func (f *InfoFrame) updateFrameInfo(s tcell.Screen) {
 			f.printNamespaceMessage(s, position.(*NamespaceMessage), posIndex)
 		case TypeNamespaceError:
 			f.printNamespaceError(s, position.(*NamespaceError), posIndex)
+		case TypeDeployment:
+			f.printDeployment(s, position.(*Deployment), posIndex)
 		case TypePod:
 			f.printPod(s, position.(*Pod), posIndex)
 		case TypeContainer:
@@ -160,17 +175,17 @@ func (f *InfoFrame) printNamespace(s tcell.Screen, ns *Namespace, yPos int) {
 
 	if !ns.isExpanded {
 		readyCount := 0
-		for podIndex, _ := range ns.pods {
-			if ns.pods[podIndex].ready == ns.pods[podIndex].total {
-				readyCount++
-			}
+		totalCount := 0
+		for dIndex := range ns.deployments {
+			totalCount += len(ns.deployments[dIndex].pods)
+			readyCount += ns.deployments[dIndex].countReadyPods()
 		}
-		if readyCount != len(ns.pods) || ns.nsError.error != nil {
+		if readyCount != totalCount || ns.nsError.error != nil {
 			style = style.Foreground(tcell.ColorRed)
 		}
 		readyColPos := f.nameColWidth - NamespaceXOffset + PodXOffset
 		drawS(s, ns.DisplayName(), NamespaceXOffset, f.y+yPos, readyColPos, style)
-		drawS(s, fmt.Sprintf("%v/%v", readyCount, len(ns.pods)), readyColPos, f.y+yPos, f.width-readyColPos, style)
+		drawS(s, fmt.Sprintf("%v/%v", readyCount, totalCount), readyColPos, f.y+yPos, f.width-readyColPos, style)
 	} else {
 		drawS(s, ns.DisplayName(), NamespaceXOffset, f.y+yPos, f.width-NamespaceXOffset, style)
 	}
@@ -182,6 +197,24 @@ func (f *InfoFrame) printNamespaceError(s tcell.Screen, nse *NamespaceError, yPo
 
 func (f *InfoFrame) printNamespaceMessage(s tcell.Screen, nse *NamespaceMessage, yPos int) {
 	drawS(s, nse.message, NamespaceMessageXOffset, f.y+yPos, f.width, tcell.StyleDefault.Foreground(tcell.ColorYellow))
+}
+
+func (f *InfoFrame) printDeployment(s tcell.Screen, d *Deployment, yPos int) {
+	style := tcell.StyleDefault
+
+	if !d.isExpanded {
+		total := len(d.pods)
+		ready := d.countReadyPods()
+		if total != ready {
+			style = style.Foreground(tcell.ColorRed)
+		}
+
+		readyColPos := f.nameColWidth - NamespaceXOffset + PodXOffset
+		drawS(s, d.name, DeploymentXOffset, f.y+yPos, readyColPos, style)
+		drawS(s, fmt.Sprintf("%v/%v", ready, total), readyColPos, f.y+yPos, f.width-readyColPos, style)
+	} else {
+		drawS(s, d.name, DeploymentXOffset, f.y+yPos, f.width, style)
+	}
 }
 
 func (f *InfoFrame) printPod(s tcell.Screen, p *Pod, yPos int) {
@@ -220,17 +253,23 @@ func (f *InfoFrame) printContainer(s tcell.Screen, c *Container, yPos int) {
 // new namespaces.
 // frame positions will need to be updated straight after to avoid errors.
 func (f *InfoFrame) updateNamespaces(podListResults []PodListResult) {
-	expandedNs := make(map[string]struct{}, 0)
-	expandedPods := make(map[string]struct{}, 0)
+	expanded := make(map[string]struct{}, 0)
 
 	for nsIndex, _ := range f.nsItems {
+		nsDisplayName := f.nsItems[nsIndex].DisplayName()
 		if f.nsItems[nsIndex].IsExpanded() {
-			expandedNs[f.nsItems[nsIndex].DisplayName()] = struct{}{}
+			expanded[nsDisplayName] = struct{}{}
 		}
-
-		for podIndex, _ := range f.nsItems[nsIndex].pods {
-			if f.nsItems[nsIndex].pods[podIndex].IsExpanded() {
-				expandedPods[f.nsItems[nsIndex].pods[podIndex].name] = struct{}{}
+		for dIndex := range f.nsItems[nsIndex].deployments {
+			deploymentName := f.nsItems[nsIndex].deployments[dIndex].name
+			if f.nsItems[nsIndex].deployments[dIndex].isExpanded {
+				// Here we need a unique deployment name, therefore it is concatenated with namespace name.
+				expanded[nsDisplayName+deploymentName] = struct{}{}
+			}
+			for podIndex := range f.nsItems[nsIndex].deployments[dIndex].pods {
+				if f.nsItems[nsIndex].deployments[dIndex].pods[podIndex].IsExpanded() {
+					expanded[f.nsItems[nsIndex].deployments[dIndex].pods[podIndex].name] = struct{}{}
+				}
 			}
 		}
 	}
@@ -251,15 +290,22 @@ func (f *InfoFrame) updateNamespaces(podListResults []PodListResult) {
 	})
 
 	for nsIndex, _ := range newNamespaces {
-		_, ok := expandedNs[newNamespaces[nsIndex].DisplayName()]
+		nsDisplayName := newNamespaces[nsIndex].DisplayName()
+		_, ok := expanded[nsDisplayName]
 		if ok {
 			newNamespaces[nsIndex].isExpanded = true
 		}
-
-		for podIndex, _ := range newNamespaces[nsIndex].pods {
-			_, ok := expandedPods[newNamespaces[nsIndex].pods[podIndex].name]
+		for dIndex := range newNamespaces[nsIndex].deployments {
+			deploymentName := newNamespaces[nsIndex].deployments[dIndex].name
+			_, ok := expanded[nsDisplayName+deploymentName]
 			if ok {
-				newNamespaces[nsIndex].pods[podIndex].isExpanded = true
+				newNamespaces[nsIndex].deployments[dIndex].Expanded(true)
+			}
+			for podIndex := range newNamespaces[nsIndex].deployments[dIndex].pods {
+				_, ok := expanded[newNamespaces[nsIndex].deployments[dIndex].pods[podIndex].name]
+				if ok {
+					newNamespaces[nsIndex].deployments[dIndex].pods[podIndex].isExpanded = true
+				}
 			}
 		}
 	}
@@ -367,9 +413,12 @@ func (f *InfoFrame) collapseAllItems(s tcell.Screen) {
 	f.refresh(s)
 }
 
-func (f *InfoFrame) expandAllNs(s tcell.Screen) {
-	for index, _ := range f.nsItems {
-		f.nsItems[index].Expanded(true)
+func (f *InfoFrame) expandAll(s tcell.Screen) {
+	for nIndex := range f.nsItems {
+		f.nsItems[nIndex].Expanded(true)
+		for dIndex := range f.nsItems[nIndex].deployments {
+			f.nsItems[nIndex].deployments[dIndex].Expanded(true)
+		}
 	}
 	f.refresh(s)
 }

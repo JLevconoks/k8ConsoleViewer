@@ -11,6 +11,7 @@ const (
 	NamespaceXOffset           = 0
 	NamespaceErrorXOffset      = 2
 	NamespaceMessageXOffset    = 2
+	DeploymentXOffset          = 1
 	PodXOffset                 = 2
 	ContainerXOffset           = 4
 	ColumnSpacing              = 2
@@ -112,7 +113,7 @@ func (gui *Gui) handleCollapseAll() {
 }
 
 func (gui *Gui) handleExpandAll() {
-	gui.mainFrame.expandAllNs(gui.s)
+	gui.mainFrame.expandAll(gui.s)
 	gui.updateStatusFrame()
 }
 
@@ -158,27 +159,43 @@ func (gui *Gui) handleRune(r rune) {
 		case '6':
 			value = fmt.Sprintf("kubectl --context %v -n %v get cm", ns.context, ns.name)
 		}
-	case TypePod:
-		pod := item.(*Pod)
+	case TypeDeployment:
+		d := item.(*Deployment)
+		context := d.namespace.context
+		nsName := d.namespace.name
 		switch r {
 		case '1':
-			value = fmt.Sprintf("kubectl --context %v -n %v logs %v", pod.namespace.context, pod.namespace.name, pod.name)
+			value = fmt.Sprintf("kubectl --context %v -n %v describe deployment %v", context, nsName, d.name)
 		case '2':
-			value = fmt.Sprintf("kubectl --context %v -n %v exec -it %v /bin/bash", pod.namespace.context, pod.namespace.name, pod.name)
+			value = fmt.Sprintf("kubectl --context %v -n %v delete pod %v", context, nsName, d.name)
 		case '3':
-			value = fmt.Sprintf("kubectl --context %v -n %v describe pod %v", pod.namespace.context, pod.namespace.name, pod.name)
+			value = fmt.Sprintf("kubectl --context %v -n %v scale deployment %v --replicas=", context, nsName, d.name)
+		}
+	case TypePod:
+		pod := item.(*Pod)
+		context := pod.deployment.namespace.context
+		nsName := pod.deployment.namespace.name
+		switch r {
+		case '1':
+			value = fmt.Sprintf("kubectl --context %v -n %v logs %v", context, nsName, pod.name)
+		case '2':
+			value = fmt.Sprintf("kubectl --context %v -n %v exec -it %v /bin/bash", context, nsName, pod.name)
+		case '3':
+			value = fmt.Sprintf("kubectl --context %v -n %v describe pod %v", context, nsName, pod.name)
 		case '4':
-			value = fmt.Sprintf("kubectl --context %v -n %v delete pod %v", pod.namespace.context, pod.namespace.name, pod.name)
+			value = fmt.Sprintf("kubectl --context %v -n %v delete pod %v", context, nsName, pod.name)
 		case '5':
-			value = fmt.Sprintf("kubectl --context %v -n %v scale deployment %v --replicas=", pod.namespace.context, pod.namespace.name, pod.deploymentName)
+			value = fmt.Sprintf("kubectl --context %v -n %v scale deployment %v --replicas=", context, nsName, pod.deployment.name)
 		}
 	case TypeContainer:
 		cont := item.(*Container)
+		context := cont.pod.deployment.namespace.context
+		nsName := cont.pod.deployment.namespace.name
 		switch r {
 		case '1':
-			value = fmt.Sprintf("kubectl --context %v -n %v logs %v -c %v", cont.pod.namespace.context, cont.pod.namespace.name, cont.pod.name, cont.name)
+			value = fmt.Sprintf("kubectl --context %v -n %v logs %v -c %v", context, nsName, cont.pod.name, cont.name)
 		case '2':
-			value = fmt.Sprintf("kubectl --context %v -n %v exec -it %v -c %v /bin/bash", cont.pod.namespace.context, cont.pod.namespace.name, cont.pod.name, cont.name)
+			value = fmt.Sprintf("kubectl --context %v -n %v exec -it %v -c %v /bin/bash", context, nsName, cont.pod.name, cont.name)
 		}
 	}
 
