@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"github.com/JLevconoks/k8ConsoleViewer/clipboard"
+	"github.com/JLevconoks/k8ConsoleViewer/terminal"
 	"github.com/gdamore/tcell"
 	"time"
 )
@@ -135,11 +136,36 @@ func (gui *Gui) handleEndKey() {
 	gui.mainFrame.moveCursor(gui.s, len(gui.mainFrame.positions)-1)
 }
 
+func (gui *Gui) execToPods() {
+	position := gui.mainFrame.cursorFullPosition()
+	item := gui.mainFrame.positions[position]
+
+	commands := make([]string, 0)
+	switch item.Type() {
+	case TypeContainer:
+		cont := item.(*Container)
+		d := cont.pod.deployment
+		pods := d.pods
+		context := d.namespace.context
+		nsName := d.namespace.name
+		gui.statusBarCh <- fmt.Sprint("Pod Count", len(pods))
+		for pIndex := range pods {
+			cmdString := fmt.Sprintf("kubectl --context %v -n %v exec -it %v -c %v /bin/bash", context, nsName, pods[pIndex].name, cont.name)
+			commands = append(commands, cmdString)
+		}
+	}
+
+	err := terminal.OpenAndExecute(commands)
+	if err != nil {
+		gui.statusBarCh <- err.Error()
+	}
+}
+
 func (gui *Gui) handleRune(r rune) {
 	if len(gui.mainFrame.positions) == 0 {
 		return
 	}
-	position := gui.mainFrame.cursorY + gui.mainFrame.scrollYOffset
+	position := gui.mainFrame.cursorFullPosition()
 	item := gui.mainFrame.positions[position]
 	var value string
 	switch item.Type() {

@@ -141,6 +141,8 @@ func (app *App) Run() {
 					gui.handleHomeKey()
 				case tcell.KeyEnd:
 					gui.handleEndKey()
+				case tcell.KeyCtrlE:
+					gui.execToPods()
 				}
 				switch ev.Rune() {
 				case 'c':
