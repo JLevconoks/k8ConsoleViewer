@@ -15,7 +15,7 @@ type Type int
 
 const (
 	TypeNamespace Type = iota + 1
-	TypeDeployment
+	TypePodGroup
 	TypePod
 	TypeContainer
 	TypeNamespaceError
@@ -31,7 +31,7 @@ type Item interface {
 type Namespace struct {
 	name        string
 	context     string
-	deployments []Deployment
+	deployments []*PodGroup
 	nsError     NamespaceError
 	nsMessage   NamespaceMessage
 	isExpanded  bool
@@ -53,30 +53,30 @@ func (n *Namespace) DisplayName() string {
 	return fmt.Sprintf("%v / %v", n.name, n.context)
 }
 
-type Deployment struct {
+type PodGroup struct {
 	name       string
 	pods       []Pod
 	isExpanded bool
 	namespace  *Namespace
 }
 
-func (d *Deployment) Type() Type {
-	return TypeDeployment
+func (pg *PodGroup) Type() Type {
+	return TypePodGroup
 }
 
-func (d *Deployment) Expanded(b bool) {
-	d.isExpanded = b
+func (pg *PodGroup) Expanded(b bool) {
+	pg.isExpanded = b
 }
 
-func (d *Deployment) IsExpanded() bool {
-	return d.isExpanded
+func (pg *PodGroup) IsExpanded() bool {
+	return pg.isExpanded
 }
 
-func (d *Deployment) countReadyPods() (ready int) {
+func (pg *PodGroup) countReadyPods() (ready int) {
 	ready = 0
 
-	for pIndex := range d.pods {
-		if d.pods[pIndex].ready == d.pods[pIndex].total {
+	for pIndex := range pg.pods {
+		if pg.pods[pIndex].ready == pg.pods[pIndex].total {
 			ready++
 		}
 	}
@@ -93,7 +93,7 @@ type Pod struct {
 	creationTime time.Time
 	containers   []Container
 	isExpanded   bool
-	deployment   *Deployment
+	deployment   *PodGroup
 }
 
 func (p *Pod) Type() Type {
@@ -222,49 +222,55 @@ func toNamespace(plr *PodListResult) Namespace {
 		}
 	}
 
-	ns.deployments = toDeployments(plr.Items, &ns)
+	ns.deployments = toPodGroup(plr.Items, &ns)
 	return ns
 }
 
-func toDeployments(pods []v1.Pod, parent *Namespace) []Deployment {
-	deploymentMap := make(map[string]Deployment)
+func toPodGroup(pods []v1.Pod, parent *Namespace) []*PodGroup {
+	podGroup := make(map[string]*PodGroup)
 
 	for _, pod := range pods {
-		deploymentName := pod.Labels["deployment"]
-		if deploymentName == "" {
-			deploymentName = "_"
+		podGroupName := "_"
+
+		switch {
+		case pod.Labels["deployment"] != "":
+			podGroupName = pod.Labels["deployment"]
+		case pod.Labels["statefulSet"] != "":
+			podGroupName = pod.Labels["statefulSet"]
+		case pod.Labels["job-name"] != "":
+			podGroupName = pod.Labels["job-name"]
 		}
 
-		d, ok := deploymentMap[deploymentName]
+		d, ok := podGroup[podGroupName]
 		if !ok {
-			d = Deployment{
-				name:       deploymentName,
+			d = &PodGroup{
+				name:       podGroupName,
 				pods:       make([]Pod, 0),
 				isExpanded: false,
 				namespace:  parent,
 			}
 		}
 
-		d.pods = append(d.pods, toPod(pod, &d))
-		deploymentMap[deploymentName] = d
+		d.pods = append(d.pods, toPod(pod, d))
+		podGroup[podGroupName] = d
 	}
 
-	deployments := make([]Deployment, len(deploymentMap))
+	podGroups := make([]*PodGroup, len(podGroup))
 
 	index := 0
-	for _, d := range deploymentMap {
-		deployments[index] = d
+	for _, d := range podGroup {
+		podGroups[index] = d
 		index++
 	}
 
-	sort.Slice(deployments, func(i, j int) bool {
-		return deployments[i].name < deployments[j].name
+	sort.Slice(podGroups, func(i, j int) bool {
+		return podGroups[i].name < podGroups[j].name
 	})
 
-	return deployments
+	return podGroups
 }
 
-func toPod(p v1.Pod, parent *Deployment) Pod {
+func toPod(p v1.Pod, parent *PodGroup) Pod {
 	pod := Pod{name: p.Name, deployment: parent}
 
 	status, ready, total, restarts, creationTime := podStats(&p)

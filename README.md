@@ -38,3 +38,5 @@ for example `ln -s ~/Tools/k8ConsoleViewer/k8ConsoleViewer /usr/local/bin/k8view
 ### Updating the app
 - Run `./k8ConsoleViewer update` and follow the instructions. 
 This will get latest release(if different), backup existing app and replace it with a new version. 
+
+(There is an hourly rate limit per IP for the Github releases endpoint, so if you will get 403, try again later)

@@ -12,7 +12,7 @@ const (
 	NamespaceXOffset           = 0
 	NamespaceErrorXOffset      = 2
 	NamespaceMessageXOffset    = 2
-	DeploymentXOffset          = 1
+	PodGroupXOffset            = 1
 	PodXOffset                 = 2
 	ContainerXOffset           = 4
 	ColumnSpacing              = 2
@@ -154,10 +154,11 @@ func (gui *Gui) execToPods() {
 			commands = append(commands, cmdString)
 		}
 	}
-
-	err := terminal.OpenAndExecute(commands)
-	if err != nil {
-		gui.statusBarCh <- err.Error()
+	if len(commands) > 0 {
+		err := terminal.OpenAndExecute(commands)
+		if err != nil {
+			gui.statusBarCh <- err.Error()
+		}
 	}
 }
 
@@ -185,17 +186,17 @@ func (gui *Gui) handleRune(r rune) {
 		case '6':
 			value = fmt.Sprintf("kubectl --context %v -n %v get cm", ns.context, ns.name)
 		}
-	case TypeDeployment:
-		d := item.(*Deployment)
-		context := d.namespace.context
-		nsName := d.namespace.name
+	case TypePodGroup:
+		pg := item.(*PodGroup)
+		context := pg.namespace.context
+		nsName := pg.namespace.name
 		switch r {
 		case '1':
-			value = fmt.Sprintf("kubectl --context %v -n %v describe deployment %v", context, nsName, d.name)
+			value = fmt.Sprintf("kubectl --context %v -n %v describe deployment %v", context, nsName, pg.name)
 		case '2':
-			value = fmt.Sprintf("kubectl --context %v -n %v delete pod %v", context, nsName, d.name)
+			value = fmt.Sprintf("kubectl --context %v -n %v delete pod %v", context, nsName, pg.name)
 		case '3':
-			value = fmt.Sprintf("kubectl --context %v -n %v scale deployment %v --replicas=", context, nsName, d.name)
+			value = fmt.Sprintf("kubectl --context %v -n %v scale deployment %v --replicas=", context, nsName, pg.name)
 		}
 	case TypePod:
 		pod := item.(*Pod)

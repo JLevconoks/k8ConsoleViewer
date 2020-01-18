@@ -82,7 +82,7 @@ func (f *InfoFrame) updatePositions() {
 			}
 
 			for dIndex := range f.nsItems[nsIndex].deployments {
-				positions = append(positions, &(f.nsItems[nsIndex].deployments[dIndex]))
+				positions = append(positions, f.nsItems[nsIndex].deployments[dIndex])
 				if f.nsItems[nsIndex].deployments[dIndex].isExpanded {
 					for pIndex := range f.nsItems[nsIndex].deployments[dIndex].pods {
 						positions = append(positions, &(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex]))
@@ -113,8 +113,8 @@ func (f *InfoFrame) updatePodHeader(s tcell.Screen) {
 		}
 		if f.nsItems[nsIndex].IsExpanded() {
 			for dIndex := range f.nsItems[nsIndex].deployments {
-				if f.nameColWidth < DeploymentXOffset+ColumnSpacing+len(f.nsItems[nsIndex].deployments[dIndex].name) {
-					f.nameColWidth = DeploymentXOffset + ColumnSpacing + len(f.nsItems[nsIndex].deployments[dIndex].name)
+				if f.nameColWidth < PodGroupXOffset+ColumnSpacing+len(f.nsItems[nsIndex].deployments[dIndex].name) {
+					f.nameColWidth = PodGroupXOffset + ColumnSpacing + len(f.nsItems[nsIndex].deployments[dIndex].name)
 				}
 				if f.nsItems[nsIndex].deployments[dIndex].isExpanded {
 					for pIndex := range f.nsItems[nsIndex].deployments[dIndex].pods {
@@ -160,8 +160,8 @@ func (f *InfoFrame) updateFrameInfo(s tcell.Screen) {
 			f.printNamespaceMessage(s, position.(*NamespaceMessage), posIndex)
 		case TypeNamespaceError:
 			f.printNamespaceError(s, position.(*NamespaceError), posIndex)
-		case TypeDeployment:
-			f.printDeployment(s, position.(*Deployment), posIndex)
+		case TypePodGroup:
+			f.printDeployment(s, position.(*PodGroup), posIndex)
 		case TypePod:
 			f.printPod(s, position.(*Pod), posIndex)
 		case TypeContainer:
@@ -199,7 +199,7 @@ func (f *InfoFrame) printNamespaceMessage(s tcell.Screen, nse *NamespaceMessage,
 	drawS(s, nse.message, NamespaceMessageXOffset, f.y+yPos, f.width, tcell.StyleDefault.Foreground(tcell.ColorYellow))
 }
 
-func (f *InfoFrame) printDeployment(s tcell.Screen, d *Deployment, yPos int) {
+func (f *InfoFrame) printDeployment(s tcell.Screen, d *PodGroup, yPos int) {
 	style := tcell.StyleDefault
 
 	if !d.isExpanded {
@@ -210,10 +210,10 @@ func (f *InfoFrame) printDeployment(s tcell.Screen, d *Deployment, yPos int) {
 		}
 
 		readyColPos := f.nameColWidth - NamespaceXOffset + PodXOffset
-		drawS(s, d.name, DeploymentXOffset, f.y+yPos, readyColPos, style)
+		drawS(s, d.name, PodGroupXOffset, f.y+yPos, readyColPos, style)
 		drawS(s, fmt.Sprintf("%v/%v", ready, total), readyColPos, f.y+yPos, f.width-readyColPos, style)
 	} else {
-		drawS(s, d.name, DeploymentXOffset, f.y+yPos, f.width, style)
+		drawS(s, d.name, PodGroupXOffset, f.y+yPos, f.width, style)
 	}
 }
 
@@ -400,6 +400,8 @@ func (f *InfoFrame) expandCurrentItem(s tcell.Screen) {
 		if !f.positions[fullPos].IsExpanded() {
 			f.positions[fullPos].Expanded(true)
 			f.refresh(s)
+		} else {
+			f.moveCursor(s, 1)
 		}
 	}
 }
