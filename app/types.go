@@ -83,6 +83,14 @@ func (pg *PodGroup) countReadyPods() (ready int) {
 	return ready
 }
 
+func (pg *PodGroup) podNames() []string {
+	names := make([]string, 0)
+	for index := range pg.pods {
+		names = append(names, pg.pods[index].name)
+	}
+	return names
+}
+
 type Pod struct {
 	name         string
 	ready        int
@@ -93,7 +101,7 @@ type Pod struct {
 	creationTime time.Time
 	containers   []Container
 	isExpanded   bool
-	deployment   *PodGroup
+	podGroup     *PodGroup
 }
 
 func (p *Pod) Type() Type {
@@ -110,6 +118,16 @@ func (p *Pod) IsExpanded() bool {
 
 func (p *Pod) ReadyString() string {
 	return fmt.Sprintf("%d/%d", p.ready, p.total)
+}
+
+func (p *Pod) containerNames() []string {
+	names := make([]string, 0)
+
+	for index := range p.containers {
+		names = append(names, p.containers[index].name)
+	}
+
+	return names
 }
 
 type Container struct {
@@ -271,7 +289,7 @@ func toPodGroup(pods []v1.Pod, parent *Namespace) []*PodGroup {
 }
 
 func toPod(p v1.Pod, parent *PodGroup) Pod {
-	pod := Pod{name: p.Name, deployment: parent}
+	pod := Pod{name: p.Name, podGroup: parent}
 
 	status, ready, total, restarts, creationTime := podStats(&p)
 

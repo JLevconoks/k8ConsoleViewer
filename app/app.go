@@ -67,7 +67,6 @@ func NewAppFromGroup(group Group) (App, error) {
 }
 
 func (app *App) Run() {
-
 	s, e := tcell.NewScreen()
 
 	if e != nil {
@@ -122,7 +121,13 @@ func (app *App) Run() {
 				previousKeyEvent = *ev
 
 				switch ev.Key() {
-				case tcell.KeyEscape, tcell.KeyCtrlC:
+				case tcell.KeyEscape:
+					if gui.popupFrame.visible {
+						gui.hidePopupFrame()
+						continue
+					}
+					fallthrough
+				case tcell.KeyCtrlC:
 					close(quit)
 					return
 				case tcell.KeyDown:
@@ -143,6 +148,8 @@ func (app *App) Run() {
 					gui.handleEndKey()
 				case tcell.KeyCtrlE:
 					gui.execToPods()
+				case tcell.KeyEnter:
+					gui.handleEnterKey()
 				}
 				switch ev.Rune() {
 				case 'c':

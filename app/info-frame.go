@@ -58,7 +58,6 @@ func (f *InfoFrame) refresh(s tcell.Screen) {
 	f.updatePodHeader(s)
 	f.updateFrameInfo(s)
 	f.updateCursor(s)
-	//s.Show() <- part of f.updateCursor(s)
 }
 
 func (f *InfoFrame) clear(s tcell.Screen) {
@@ -318,7 +317,6 @@ func (f *InfoFrame) updateCursor(s tcell.Screen) {
 		f.moveCursor(s, -diff)
 	}
 	s.ShowCursor(f.x+f.cursorX, f.y+f.cursorY)
-	s.Show()
 }
 
 // moveCursor will move cursor n positions from current position.

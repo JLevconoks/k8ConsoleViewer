@@ -33,6 +33,7 @@ type Gui struct {
 	groupName   StringItem
 	mainFrame   *InfoFrame
 	footerFrame *FooterFrame
+	popupFrame  *PopupFrame
 	statusBarCh chan string
 }
 
@@ -54,6 +55,7 @@ func NewGui(s tcell.Screen, name string) Gui {
 		groupName:   groupName,
 		mainFrame:   NewInfoFrame(sw, sh),
 		footerFrame: footerFrame,
+		popupFrame:  NewPopupFrame("", nil, nil),
 		statusBarCh: footerFrame.statusBarCh,
 	}
 }
@@ -77,89 +79,157 @@ func (gui *Gui) updateNamespaces(s tcell.Screen, podListResults []PodListResult,
 		timeStyle = timeStyle.Foreground(tcell.ColorYellow)
 	}
 	gui.execTime.UpdateS(s, timeToExec.String(), timeStyle)
-	gui.mainFrame.refresh(s)
+	gui.redraw(s)
 	gui.mainFrame.Mutex.Unlock()
-	gui.updateStatusFrame()
 	gui.statusBarCh <- ""
 }
 
-func (gui *Gui) handleKeyDown() {
-	gui.mainFrame.moveCursor(gui.s, 1)
+func (gui *Gui) redraw(s tcell.Screen) {
+	gui.mainFrame.refresh(s)
 	gui.updateStatusFrame()
+	if gui.popupFrame != nil && gui.popupFrame.visible {
+		gui.popupFrame.show(s)
+	}
+	s.Show()
+}
+
+func (gui *Gui) handleKeyDown() {
+	if gui.popupFrame.visible {
+		gui.popupFrame.moveCursorDown(gui.s)
+	} else {
+		gui.mainFrame.moveCursor(gui.s, 1)
+		gui.updateStatusFrame()
+	}
+
+	gui.s.Show()
 }
 
 func (gui *Gui) handleKeyUp() {
-	gui.mainFrame.moveCursor(gui.s, -1)
-	gui.updateStatusFrame()
+	if gui.popupFrame.visible {
+		gui.popupFrame.moveCursorUp(gui.s)
+	} else {
+		gui.mainFrame.moveCursor(gui.s, -1)
+		gui.updateStatusFrame()
+	}
+
+	gui.s.Show()
 }
 
 func (gui *Gui) handleKeyLeft() {
 	gui.mainFrame.collapseCurrentItem(gui.s)
 	gui.updateStatusFrame()
+	gui.s.Show()
 }
 
 func (gui *Gui) handleKeyRight() {
 	gui.mainFrame.expandCurrentItem(gui.s)
+	gui.s.Show()
 }
 
 func (gui *Gui) handleResize() {
 	winWidth, winHeight := gui.s.Size()
 	gui.mainFrame.resize(gui.s, winWidth, winHeight)
 	gui.footerFrame.resize(gui.s, winWidth, winHeight)
+	gui.s.Show()
 }
 
 func (gui *Gui) handleCollapseAll() {
 	gui.mainFrame.collapseAllItems(gui.s)
 	gui.updateStatusFrame()
+	gui.s.Show()
 }
 
 func (gui *Gui) handleExpandAll() {
 	gui.mainFrame.expandAll(gui.s)
 	gui.updateStatusFrame()
+	gui.s.Show()
 }
 
 func (gui *Gui) handlePageUp() {
 	gui.mainFrame.pageUp(gui.s)
 	gui.updateStatusFrame()
+	gui.s.Show()
 }
 
 func (gui *Gui) handlePageDown() {
 	gui.mainFrame.pageDown(gui.s)
 	gui.updateStatusFrame()
+	gui.s.Show()
 }
 
 func (gui *Gui) handleHomeKey() {
 	gui.mainFrame.moveCursor(gui.s, -len(gui.mainFrame.positions)-1)
+	gui.s.Show()
 }
 
 func (gui *Gui) handleEndKey() {
 	gui.mainFrame.moveCursor(gui.s, len(gui.mainFrame.positions)-1)
+	gui.s.Show()
+}
+
+func (gui *Gui) hidePopupFrame() {
+	gui.popupFrame.visible = false
+	gui.redraw(gui.s)
+}
+
+func (gui *Gui) handleEnterKey() {
+	if gui.popupFrame.visible {
+		selected := gui.popupFrame.items[gui.popupFrame.cursorYPos]
+		gui.popupFrame.callback(selected)
+		gui.popupFrame.visible = false
+		gui.redraw(gui.s)
+	}
 }
 
 func (gui *Gui) execToPods() {
+	// TODO need to do something better regarding this check.
+	if len(gui.mainFrame.positions) == 0 {
+		return
+	}
 	position := gui.mainFrame.cursorFullPosition()
 	item := gui.mainFrame.positions[position]
 
-	commands := make([]string, 0)
+	var podNames []string
+	var contNames []string
+	context := ""
+	nsName := ""
+
 	switch item.Type() {
+	case TypePodGroup:
+		pg := item.(*PodGroup)
+		context = pg.namespace.context
+		nsName = pg.namespace.name
+		podNames = pg.podNames()
+		// TODO check for empty slice
+		contNames = pg.pods[0].containerNames()
+	case TypePod:
+		p := item.(*Pod)
+		context = p.podGroup.namespace.context
+		nsName = p.podGroup.namespace.name
+		podNames = p.podGroup.podNames()
+		contNames = p.containerNames()
 	case TypeContainer:
-		cont := item.(*Container)
-		d := cont.pod.deployment
-		pods := d.pods
-		context := d.namespace.context
-		nsName := d.namespace.name
-		gui.statusBarCh <- fmt.Sprint("Pod Count", len(pods))
-		for pIndex := range pods {
-			cmdString := fmt.Sprintf("kubectl --context %v -n %v exec -it %v -c %v /bin/bash", context, nsName, pods[pIndex].name, cont.name)
-			commands = append(commands, cmdString)
+		c := item.(*Container)
+		context = c.pod.podGroup.namespace.context
+		nsName = c.pod.podGroup.namespace.name
+		podNames = c.pod.podGroup.podNames()
+		contNames = c.pod.containerNames()
+	}
+
+	popupCallback := func(selected string) {
+		commands := assembleExecCommands(context, nsName, selected, podNames)
+		if len(commands) > 0 {
+			err := terminal.OpenAndExecute(commands)
+			if err != nil {
+				gui.statusBarCh <- err.Error()
+			}
 		}
 	}
-	if len(commands) > 0 {
-		err := terminal.OpenAndExecute(commands)
-		if err != nil {
-			gui.statusBarCh <- err.Error()
-		}
-	}
+
+	gui.popupFrame = NewPopupFrame("Containers", contNames, popupCallback)
+	gui.popupFrame.visible = true
+	gui.popupFrame.show(gui.s)
+	gui.s.Show()
 }
 
 func (gui *Gui) handleRune(r rune) {
@@ -200,8 +270,8 @@ func (gui *Gui) handleRune(r rune) {
 		}
 	case TypePod:
 		pod := item.(*Pod)
-		context := pod.deployment.namespace.context
-		nsName := pod.deployment.namespace.name
+		context := pod.podGroup.namespace.context
+		nsName := pod.podGroup.namespace.name
 		switch r {
 		case '1':
 			value = fmt.Sprintf("kubectl --context %v -n %v logs %v", context, nsName, pod.name)
@@ -212,12 +282,12 @@ func (gui *Gui) handleRune(r rune) {
 		case '4':
 			value = fmt.Sprintf("kubectl --context %v -n %v delete pod %v", context, nsName, pod.name)
 		case '5':
-			value = fmt.Sprintf("kubectl --context %v -n %v scale deployment %v --replicas=", context, nsName, pod.deployment.name)
+			value = fmt.Sprintf("kubectl --context %v -n %v scale deployment %v --replicas=", context, nsName, pod.podGroup.name)
 		}
 	case TypeContainer:
 		cont := item.(*Container)
-		context := cont.pod.deployment.namespace.context
-		nsName := cont.pod.deployment.namespace.name
+		context := cont.pod.podGroup.namespace.context
+		nsName := cont.pod.podGroup.namespace.name
 		switch r {
 		case '1':
 			value = fmt.Sprintf("kubectl --context %v -n %v logs %v -c %v", context, nsName, cont.pod.name, cont.name)
@@ -245,6 +315,17 @@ func (gui *Gui) updateStatusFrame() {
 	}
 	item := gui.mainFrame.positions[gui.mainFrame.cursorFullPosition()]
 	gui.footerFrame.updateShortcutInfo(gui.s, item)
+}
+
+func assembleExecCommands(context, nsName, contName string, pods []string) []string {
+	commands := make([]string, 0)
+
+	for _, podName := range pods {
+		cmdString := fmt.Sprintf("kubectl --context %v -n %v exec -it %v -c %v /bin/bash", context, nsName, podName, contName)
+		commands = append(commands, cmdString)
+	}
+
+	return commands
 }
 
 func drawS(s tcell.Screen, value string, x, y, length int, style tcell.Style) {
