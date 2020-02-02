@@ -148,6 +148,10 @@ func (app *App) Run() {
 					gui.handleEndKey()
 				case tcell.KeyCtrlE:
 					gui.execToPods()
+				case tcell.KeyCtrlL:
+					gui.getLogsFromPods()
+				case tcell.KeyCtrlK:
+					gui.getLogsAndFollowFromPods()
 				case tcell.KeyEnter:
 					gui.handleEnterKey()
 				}

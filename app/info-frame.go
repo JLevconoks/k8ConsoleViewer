@@ -160,7 +160,7 @@ func (f *InfoFrame) updateFrameInfo(s tcell.Screen) {
 		case TypeNamespaceError:
 			f.printNamespaceError(s, position.(*NamespaceError), posIndex)
 		case TypePodGroup:
-			f.printDeployment(s, position.(*PodGroup), posIndex)
+			f.printPodGroup(s, position.(*PodGroup), posIndex)
 		case TypePod:
 			f.printPod(s, position.(*Pod), posIndex)
 		case TypeContainer:
@@ -198,7 +198,7 @@ func (f *InfoFrame) printNamespaceMessage(s tcell.Screen, nse *NamespaceMessage,
 	drawS(s, nse.message, NamespaceMessageXOffset, f.y+yPos, f.width, tcell.StyleDefault.Foreground(tcell.ColorYellow))
 }
 
-func (f *InfoFrame) printDeployment(s tcell.Screen, d *PodGroup, yPos int) {
+func (f *InfoFrame) printPodGroup(s tcell.Screen, d *PodGroup, yPos int) {
 	style := tcell.StyleDefault
 
 	if !d.isExpanded {
@@ -206,6 +206,8 @@ func (f *InfoFrame) printDeployment(s tcell.Screen, d *PodGroup, yPos int) {
 		ready := d.countReadyPods()
 		if total != ready {
 			style = style.Foreground(tcell.ColorRed)
+		} else {
+			style = style.Foreground(tcell.ColorGreen)
 		}
 
 		readyColPos := f.nameColWidth - NamespaceXOffset + PodXOffset

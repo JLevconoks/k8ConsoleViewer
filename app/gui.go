@@ -182,54 +182,18 @@ func (gui *Gui) handleEnterKey() {
 }
 
 func (gui *Gui) execToPods() {
-	// TODO need to do something better regarding this check.
-	if len(gui.mainFrame.positions) == 0 {
-		return
-	}
-	position := gui.mainFrame.cursorFullPosition()
-	item := gui.mainFrame.positions[position]
+	cmdTemplate := "kubectl --context %v -n %v exec -it %v -c %v /bin/bash"
+	gui.handleCommandExec(cmdTemplate)
+}
 
-	var podNames []string
-	var contNames []string
-	context := ""
-	nsName := ""
+func (gui *Gui) getLogsFromPods() {
+	cmdTemplate := "kubectl --context %v -n %v logs %v -c %v"
+	gui.handleCommandExec(cmdTemplate)
+}
 
-	switch item.Type() {
-	case TypePodGroup:
-		pg := item.(*PodGroup)
-		context = pg.namespace.context
-		nsName = pg.namespace.name
-		podNames = pg.podNames()
-		// TODO check for empty slice
-		contNames = pg.pods[0].containerNames()
-	case TypePod:
-		p := item.(*Pod)
-		context = p.podGroup.namespace.context
-		nsName = p.podGroup.namespace.name
-		podNames = p.podGroup.podNames()
-		contNames = p.containerNames()
-	case TypeContainer:
-		c := item.(*Container)
-		context = c.pod.podGroup.namespace.context
-		nsName = c.pod.podGroup.namespace.name
-		podNames = c.pod.podGroup.podNames()
-		contNames = c.pod.containerNames()
-	}
-
-	popupCallback := func(selected string) {
-		commands := assembleExecCommands(context, nsName, selected, podNames)
-		if len(commands) > 0 {
-			err := terminal.OpenAndExecute(commands)
-			if err != nil {
-				gui.statusBarCh <- err.Error()
-			}
-		}
-	}
-
-	gui.popupFrame = NewPopupFrame(gui.s, "Container", contNames, popupCallback)
-	gui.popupFrame.visible = true
-	gui.popupFrame.show(gui.s)
-	gui.s.Show()
+func (gui *Gui) getLogsAndFollowFromPods() {
+	cmdTemplate := "kubectl --context %v -n %v logs %v -c %v -f"
+	gui.handleCommandExec(cmdTemplate)
 }
 
 func (gui *Gui) handleRune(r rune) {
@@ -317,11 +281,63 @@ func (gui *Gui) updateStatusFrame() {
 	gui.footerFrame.updateShortcutInfo(gui.s, item)
 }
 
-func assembleExecCommands(context, nsName, contName string, pods []string) []string {
+func (gui *Gui) handleCommandExec(tmpl string) {
+	// TODO need to do something better regarding this check.
+	if len(gui.mainFrame.positions) == 0 {
+		return
+	}
+
+	position := gui.mainFrame.cursorFullPosition()
+	item := gui.mainFrame.positions[position]
+
+	context, nsName, podNames, contNames := gatherContainerInfos(item)
+
+	popupCallback := func(selected string) {
+		commands := assembleCommands(tmpl, context, nsName, selected, podNames)
+		if len(commands) > 0 {
+			err := terminal.OpenAndExecute(commands)
+			if err != nil {
+				gui.statusBarCh <- err.Error()
+			}
+		}
+	}
+	gui.popupFrame = NewPopupFrame(gui.s, "Container", contNames, popupCallback)
+	gui.popupFrame.visible = true
+	gui.popupFrame.show(gui.s)
+	gui.s.Show()
+}
+
+func gatherContainerInfos(item Item) (context, nsName string, podNames, contNames []string) {
+	switch item.Type() {
+	case TypePodGroup:
+		pg := item.(*PodGroup)
+		context = pg.namespace.context
+		nsName = pg.namespace.name
+		podNames = pg.podNames()
+		// TODO check for empty slice
+		contNames = pg.pods[0].containerNames()
+	case TypePod:
+		p := item.(*Pod)
+		context = p.podGroup.namespace.context
+		nsName = p.podGroup.namespace.name
+		podNames = p.podGroup.podNames()
+		contNames = p.containerNames()
+	case TypeContainer:
+		c := item.(*Container)
+		context = c.pod.podGroup.namespace.context
+		nsName = c.pod.podGroup.namespace.name
+		podNames = c.pod.podGroup.podNames()
+		contNames = c.pod.containerNames()
+	}
+
+	return context, nsName, podNames, contNames
+}
+
+func assembleCommands(tmpl, context, nsName, contName string, pods []string) []string {
 	commands := make([]string, 0)
 
 	for _, podName := range pods {
-		cmdString := fmt.Sprintf("kubectl --context %v -n %v exec -it %v -c %v /bin/bash", context, nsName, podName, contName)
+		cmdString := fmt.Sprintf(tmpl, context, nsName, podName, contName)
 		commands = append(commands, cmdString)
 	}
 

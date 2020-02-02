@@ -13,6 +13,11 @@ At this moment it is mainly aimed at MacOS.
 - `Home` - scroll to the top
 - `End` - scroll to the end
 
+### iTerm integration (open iTerm, split the window and execute command)
+- `Ctrl + E` - exec in all containers in the pod group
+- `Ctrl + L` - get logs from all containers in pod group 
+- `Ctrl + K` - follow logs from all containers in pod group 
+
 ### How to use:
 #### **Please note, each `context/namespace` pair is a separate `get pods` call to Kubernetes with your credentials every 5 seconds, so be considerate with the number of namespaces you are monitoring.** 
 
