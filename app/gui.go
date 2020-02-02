@@ -55,7 +55,7 @@ func NewGui(s tcell.Screen, name string) Gui {
 		groupName:   groupName,
 		mainFrame:   NewInfoFrame(sw, sh),
 		footerFrame: footerFrame,
-		popupFrame:  NewPopupFrame("", nil, nil),
+		popupFrame:  NewPopupFrame(s, "", nil, nil),
 		statusBarCh: footerFrame.statusBarCh,
 	}
 }
@@ -226,7 +226,7 @@ func (gui *Gui) execToPods() {
 		}
 	}
 
-	gui.popupFrame = NewPopupFrame("Containers", contNames, popupCallback)
+	gui.popupFrame = NewPopupFrame(gui.s, "Container", contNames, popupCallback)
 	gui.popupFrame.visible = true
 	gui.popupFrame.show(gui.s)
 	gui.s.Show()

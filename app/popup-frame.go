@@ -17,18 +17,15 @@ type PopupFrame struct {
 	callback      func(string)
 }
 
-func NewPopupFrame(title string, items []string, callback func(string)) *PopupFrame {
-	return &PopupFrame{
-		x: 5,
-		y: 5,
-		// TODO: This needs to be dynamic
-		width:    15,
-		height:   15,
+func NewPopupFrame(s tcell.Screen, title string, items []string, callback func(string)) *PopupFrame {
+	popup := &PopupFrame{
 		visible:  false,
 		title:    title,
 		items:    items,
 		callback: callback,
 	}
+	popup.resize(s)
+	return popup
 }
 
 func (pf *PopupFrame) show(s tcell.Screen) {
@@ -84,4 +81,25 @@ func (pf *PopupFrame) drawItems(s tcell.Screen) {
 		}
 		draw(s, item, pf.x+PopupItemXOffset, pf.y+PopupItemYOffset+index, len(item), style)
 	}
+}
+
+func (pf *PopupFrame) resize(s tcell.Screen) {
+	frameHeight := len(pf.items) + 2
+	w := len(pf.title) + 2
+	for _, item := range pf.items {
+		length := len(item)
+		if length > w {
+			w = length
+		}
+	}
+
+	pf.height = frameHeight
+	pf.width = w + 3
+
+	sw, sh := s.Size()
+	newX := (sw - pf.width) / 2
+	newY := (sh - pf.height) / 2
+
+	pf.x = newX
+	pf.y = newY
 }
