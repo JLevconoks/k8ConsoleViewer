@@ -65,14 +65,14 @@ func OpenAndExecute(commands []string) error {
 	}
 
 	template.Must(templ, err)
-	var bytes bytes.Buffer
+	var b bytes.Buffer
 
-	err = templ.Execute(&bytes, commands)
+	err = templ.Execute(&b, commands)
 	if err != nil {
 		return err
 	}
 
-	cmd := exec.Command("python3", "-c", bytes.String())
+	cmd := exec.Command("python3", "-c", b.String())
 
 	cmd.Stderr = os.Stdout
 	cmd.Stdout = os.Stdout
