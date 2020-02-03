@@ -54,7 +54,7 @@ pip3 install pyobjc
 ### Symlink to `/url/local/bin`  
 You can make a symlink to `/url/local/bin` to launch it from anywhere `ln -s <path to the app executable> /usr/local/bin/<prefered name>` 
 
-for example `ln -s ~/Tools/k8ConsoleViewer/k8ConsoleViewer /usr/local/bin/k8viewer`  
+For example `ln -s ~/Tools/k8ConsoleViewer/k8ConsoleViewer /usr/local/bin/k8viewer`  
 
 ---
 ### Updating the app
