@@ -221,12 +221,14 @@ func (f *InfoFrame) printPodGroup(s tcell.Screen, d *PodGroup, yPos int) {
 func (f *InfoFrame) printPod(s tcell.Screen, p *Pod, yPos int) {
 	running := p.status == "Running"
 	style := tcell.StyleDefault
-	if running && p.ready >= p.total {
-		style = style.Foreground(tcell.ColorGreen)
-	} else if running && p.ready < p.total {
-		style = style.Foreground(tcell.ColorYellow)
-	} else {
-		style = style.Foreground(tcell.ColorRed)
+	if !p.isExpanded {
+		if running && p.ready >= p.total {
+			style = style.Foreground(tcell.ColorGreen)
+		} else if running && p.ready < p.total {
+			style = style.Foreground(tcell.ColorYellow)
+		} else {
+			style = style.Foreground(tcell.ColorRed)
+		}
 	}
 
 	xOffset := PodXOffset
