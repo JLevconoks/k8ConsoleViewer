@@ -45,7 +45,7 @@ pip3 install pyobjc
 - Enable Python API in iTerm2  
 ```text Preferences -> General -> Magic -> Enable Python Api ```  
   
-#### Shortcuts  
+#### Shortcuts: 
 - `Ctrl + E` - exec in all containers in the pod group  
 - `Ctrl + L` - get logs from all containers in pod group   
 - `Ctrl + K` - follow logs from all containers in pod group   

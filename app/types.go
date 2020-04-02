@@ -257,6 +257,8 @@ func toPodGroup(pods []v1.Pod, parent *Namespace) []*PodGroup {
 			podGroupName = pod.Labels["statefulSet"]
 		case pod.Labels["job-name"] != "":
 			podGroupName = pod.Labels["job-name"]
+		case pod.Labels["app"] != "":
+			podGroupName = pod.Labels["app"]
 		}
 
 		d, ok := podGroup[podGroupName]
