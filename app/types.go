@@ -22,6 +22,17 @@ const (
 	TypeNamespaceMessage
 )
 
+func (t Type) String() string {
+	return [...]string{
+		"",
+		"Namespace",
+		"Group",
+		"Pod",
+		"Container",
+		"NamespaceError",
+		"NamespaceMessage"}[t]
+}
+
 type Item interface {
 	Type() Type
 	Expanded(b bool)

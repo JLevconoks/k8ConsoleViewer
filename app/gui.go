@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"github.com/JLevconoks/k8ConsoleViewer/clipboard"
 	"github.com/JLevconoks/k8ConsoleViewer/terminal"
 	"github.com/gdamore/tcell"
 	"time"
@@ -196,80 +195,38 @@ func (gui *Gui) getLogsAndFollowFromPods() {
 	gui.handleCommandExec(cmdTemplate)
 }
 
-func (gui *Gui) handleRune(r rune) {
-	if len(gui.mainFrame.positions) == 0 {
-		return
-	}
+func (gui *Gui) getCurrentGuiItemInfo() GuiItemInfo {
 	position := gui.mainFrame.cursorFullPosition()
 	item := gui.mainFrame.positions[position]
-	var value string
-	switch item.Type() {
+	itemType := item.Type()
+
+	data := GuiItemInfo{itemType: itemType}
+
+	switch itemType {
 	case TypeNamespace:
 		ns := item.(*Namespace)
-		switch r {
-		case '1':
-			value = fmt.Sprintf("kubectl --context %v -n %v get all", ns.context, ns.name)
-		case '2':
-			value = fmt.Sprintf("kubectl --context %v -n %v get ingress", ns.context, ns.name)
-		case '3':
-			value = fmt.Sprintf("kubectl --context %v -n %v get ev --sort-by=.lastTimestamp", ns.context, ns.name)
-		case '4':
-			value = fmt.Sprintf("kubectl --context %v describe ns %v", ns.context, ns.name)
-		case '5':
-			value = fmt.Sprintf("kubectl --context %v -n %v get secrets", ns.context, ns.name)
-		case '6':
-			value = fmt.Sprintf("kubectl --context %v -n %v get cm", ns.context, ns.name)
-		}
+		data.Context = ns.context
+		data.Namespace = ns.name
 	case TypePodGroup:
 		pg := item.(*PodGroup)
-		context := pg.namespace.context
-		nsName := pg.namespace.name
-		switch r {
-		case '1':
-			value = fmt.Sprintf("kubectl --context %v -n %v describe deployment %v", context, nsName, pg.name)
-		case '2':
-			value = fmt.Sprintf("kubectl --context %v -n %v delete pod %v", context, nsName, pg.name)
-		case '3':
-			value = fmt.Sprintf("kubectl --context %v -n %v scale deployment %v --replicas=", context, nsName, pg.name)
-		}
+		data.Context = pg.namespace.context
+		data.Namespace = pg.namespace.name
+		data.Group = pg.name
 	case TypePod:
 		pod := item.(*Pod)
-		context := pod.podGroup.namespace.context
-		nsName := pod.podGroup.namespace.name
-		switch r {
-		case '1':
-			value = fmt.Sprintf("kubectl --context %v -n %v logs %v", context, nsName, pod.name)
-		case '2':
-			value = fmt.Sprintf("kubectl --context %v -n %v exec -it %v /bin/bash", context, nsName, pod.name)
-		case '3':
-			value = fmt.Sprintf("kubectl --context %v -n %v describe pod %v", context, nsName, pod.name)
-		case '4':
-			value = fmt.Sprintf("kubectl --context %v -n %v delete pod %v", context, nsName, pod.name)
-		case '5':
-			value = fmt.Sprintf("kubectl --context %v -n %v scale deployment %v --replicas=", context, nsName, pod.podGroup.name)
-		}
+		data.Context = pod.podGroup.namespace.context
+		data.Namespace = pod.podGroup.namespace.name
+		data.Group = pod.podGroup.name
+		data.Pod = pod.name
 	case TypeContainer:
-		cont := item.(*Container)
-		context := cont.pod.podGroup.namespace.context
-		nsName := cont.pod.podGroup.namespace.name
-		switch r {
-		case '1':
-			value = fmt.Sprintf("kubectl --context %v -n %v logs %v -c %v", context, nsName, cont.pod.name, cont.name)
-		case '2':
-			value = fmt.Sprintf("kubectl --context %v -n %v exec -it %v -c %v /bin/bash", context, nsName, cont.pod.name, cont.name)
-		}
+		c := item.(*Container)
+		data.Context = c.pod.podGroup.namespace.context
+		data.Namespace = c.pod.podGroup.namespace.name
+		data.Group = c.pod.podGroup.name
+		data.Pod = c.pod.name
+		data.Container = c.name
 	}
-
-	if value == "" {
-		return
-	}
-	gui.statusBarCh <- "Clipboard: " + value
-	err := clipboard.ToClipboard(value)
-
-	if err != nil {
-		gui.statusBarCh <- "Error: " + err.Error()
-		return
-	}
+	return data
 }
 
 func (gui *Gui) updateStatusFrame() {
