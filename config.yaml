@@ -1,6 +1,6 @@
 # This is an initial attempt to make clipboard shortcuts configurable
 # Available element types: namespace, group, pod, container, namespaceerror, namespacemessage
-# Available variables to use in templates: {{.Context}}, {{.Namespace}}, {{.Group}}, {{.Pod}}, {{.Container}}
+# Available variables to use in templates, case sensitive: {{.Context}}, {{.Namespace}}, {{.Group}}, {{.Pod}}, {{.Container}}
 
 clipboardShortcuts:
   # Element type where the cursor is positioned.
