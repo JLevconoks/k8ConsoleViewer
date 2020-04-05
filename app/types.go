@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gdamore/tcell"
 	v1 "k8s.io/api/core/v1"
@@ -31,6 +32,25 @@ func (t Type) String() string {
 		"Container",
 		"NamespaceError",
 		"NamespaceMessage"}[t]
+}
+
+func toType(s string) (Type, error) {
+	switch strings.ToLower(s) {
+	case "namespace":
+		return TypeNamespace, nil
+	case "group":
+		return TypePodGroup, nil
+	case "pod":
+		return TypePod, nil
+	case "container":
+		return TypeContainer, nil
+	case "namespaceerror":
+		return TypeNamespaceError, nil
+	case "namespacemessage":
+		return TypeNamespaceMessage, nil
+	default:
+		return 0, errors.New(fmt.Sprintf("no such type '%v'", s))
+	}
 }
 
 type Item interface {

@@ -31,7 +31,7 @@ type App struct {
 	commandShortcuts map[Type]map[rune]ClipboardShortcut
 }
 
-func NewApp(context string, namespace string) (App, error) {
+func NewApp(context string, namespace string, settings map[string]interface{}) (App, error) {
 	contextNameSet := make(map[string]struct{})
 	contextNameSet[context] = struct{}{}
 	k8Client, err := NewK8ClientSets(contextNameSet)
@@ -49,7 +49,7 @@ func NewApp(context string, namespace string) (App, error) {
 		g = buildGroup(fmt.Sprintf("%v/%v", context, namespace), context, namespace)
 	}
 
-	cs, err := defaultClipboardShortcuts()
+	cs, err := getClipboardShortcuts(settings)
 	if err != nil {
 		return App{}, err
 	}
@@ -60,7 +60,7 @@ func NewApp(context string, namespace string) (App, error) {
 	}, nil
 }
 
-func NewAppFromGroup(group Group) (App, error) {
+func NewAppFromGroup(group Group, settings map[string]interface{}) (App, error) {
 	contextNameSet := make(map[string]struct{})
 	for i := range group.NsGroups {
 		contextNameSet[group.NsGroups[i].Context] = struct{}{}
@@ -70,7 +70,7 @@ func NewAppFromGroup(group Group) (App, error) {
 		return App{}, err
 	}
 
-	cs, err := defaultClipboardShortcuts()
+	cs, err := getClipboardShortcuts(settings)
 	if err != nil {
 		return App{}, err
 	}
@@ -80,6 +80,22 @@ func NewAppFromGroup(group Group) (App, error) {
 		group:            group,
 		commandShortcuts: cs,
 	}, nil
+}
+
+func getClipboardShortcuts(settings map[string]interface{}) (map[Type]map[rune]ClipboardShortcut, error) {
+	cs, err := convertFromViperSettings(settings)
+	if err != nil {
+		return nil, err
+	}
+	// this is the case when 'clipboardShortcuts' block is not present in config.
+	if cs == nil {
+		cs, err = defaultClipboardShortcuts()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return cs, nil
 }
 
 func (app *App) Run() {

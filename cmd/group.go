@@ -6,6 +6,7 @@ import (
 	"github.com/JLevconoks/k8ConsoleViewer/app"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -41,7 +42,8 @@ func runGroupCmd(cmd *cobra.Command, args []string) {
 		os.Exit(0)
 	}
 
-	k8app, err := app.NewAppFromGroup(group)
+	settings := viper.AllSettings()
+	k8app, err := app.NewAppFromGroup(group, settings)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(0)
