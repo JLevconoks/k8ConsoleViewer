@@ -1,11 +1,25 @@
 This is a small console app designed for monitoring pod statuses in multiple namespaces.   
-  
+
 At this moment it is aimed at MacOS and iTerm2.  
+
+Information displayed in tree like structure:
+```text
+namespace / context
+  group
+    pod-1
+      container-1
+      container-2
+    pod-2
+      container-1
+      container-2
+```
+Please note: `group` is not always a deployment name, it is picked from available labels on the pod `deployment`, `statefulSet`, `job-name`, `app` in the priority order listed. 
+This might be not ideal but so far it worked fine in my use case. 
 
 ---
   
 ## How to use:  
-**Please note, each `context/namespace` pair is a separate `get pods` call to Kubernetes with your credentials every 5 seconds, so be considerate with the number of namespaces you are monitoring.**   
+**Please note: each `context/namespace` pair is a separate `get pods` call to Kubernetes with your credentials every 5 seconds, so be considerate with the number of namespaces you are monitoring.**   
 
 - Download latest release from [releases page](https://github.com/JLevconoks/k8ConsoleViewer/releases)  
 - Run `./k8ConsoleViewer -c <context> -n <namespace>`   
@@ -19,8 +33,7 @@ Namespace name can contain wildcards for example 'foo*bar' will be converted to 
 **When using wildcard namespace name need to be in quotes, to correctly pass parameter to the application.**  
 `./k8ConsoleViewer -c foo -n "bar*"`  
   
-#### Shortcuts/Hotkeys:  
-- `1-9` - copy commands to clipboard, more info in app footer  
+#### Hard coded Shortcuts/Hotkeys:   
 - `e` - expand all namespaces  
 - `c` - collapse all elements  
 - `left` - collapse item / navigate to parent item  
@@ -29,6 +42,24 @@ Namespace name can contain wildcards for example 'foo*bar' will be converted to 
 - `PgDn` - scroll down a page  
 - `Home` - scroll to the top  
 - `End` - scroll to the end  
+
+#### Configurable clipboard shortcuts   
+There is a way to change default clipboard shortcuts and create your own templates. 
+Place [config.yaml](https://github.com/JLevconoks/k8ConsoleViewer/blob/master/config.yaml) alongside the executable and modify it to your liking.
+
+Example: 
+```yaml 
+clipboardShortcuts:
+  # Element type where the cursor is positioned.
+  namespace:
+    # Shortcut keys 0-9 and a-z, some other characters can work, but not tested.
+    'a':
+      # Display name in footer
+      name: "get all"
+      # Shortcut template to be copied in your clipboard.
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} get all"
+```
+See more details in the config file.  
   
 ---
 

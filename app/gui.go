@@ -20,8 +20,8 @@ const (
 	StatusColumnDefaultWidth   = 6 + ColumnSpacing
 	RestartsColumnDefaultWidth = 8 + ColumnSpacing
 	AgeColumnDefaultWidth      = 3 + ColumnSpacing
-	MainFrameStartY            = 5
-	FooterFrameHeight          = 4
+	MainFrameStartY            = 4 //Excluding header line.
+	FooterFrameHeight          = 4 //Including divider line.
 )
 
 type Gui struct {
@@ -64,7 +64,6 @@ func (gui *Gui) show(s tcell.Screen) {
 	gui.execLabel.Draw(s)
 	gui.execTime.Draw(s)
 	gui.groupName.Draw(s)
-	gui.mainFrame.namespaceHeader.Draw(s)
 	gui.mainFrame.podHeader.Draw(s)
 	s.Show()
 }

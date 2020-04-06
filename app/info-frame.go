@@ -16,7 +16,6 @@ type InfoFrame struct {
 	width, height    int
 	cursorX, cursorY int
 	scrollYOffset    int
-	namespaceHeader  StringItem
 	podHeader        StringItem
 	positions        []Item
 	nsItems          []Namespace
@@ -28,8 +27,7 @@ type InfoFrame struct {
 }
 
 func NewInfoFrame(winWidth, winHeight int) *InfoFrame {
-	nsHeader := StringItem{NamespaceXOffset, 3, 0, "NAMESPACE / CONTEXT"}
-	podHeader := StringItem{PodXOffset, 4, 0, "NAME  READY  STATUS  RESTARTS  AGE"}
+	podHeader := StringItem{0, 3, 0, "NAME  READY  STATUS  RESTARTS  AGE"}
 	width, height := calcInfoFrameSize(winWidth, winHeight)
 
 	return &InfoFrame{
@@ -40,7 +38,6 @@ func NewInfoFrame(winWidth, winHeight int) *InfoFrame {
 		cursorX:          0,
 		cursorY:          0,
 		scrollYOffset:    0,
-		namespaceHeader:  nsHeader,
 		podHeader:        podHeader,
 		positions:        []Item{},
 		nsItems:          []Namespace{},
@@ -106,7 +103,7 @@ func (f *InfoFrame) updatePodHeader(s tcell.Screen) {
 	f.restartsColWidth = RestartsColumnDefaultWidth
 	f.ageColWidth = AgeColumnDefaultWidth
 
-	for nsIndex, _ := range f.nsItems {
+	for nsIndex := range f.nsItems {
 		if f.nameColWidth < ColumnSpacing+len(f.nsItems[nsIndex].DisplayName()) {
 			f.nameColWidth = ColumnSpacing + len(f.nsItems[nsIndex].DisplayName())
 		}
@@ -117,8 +114,8 @@ func (f *InfoFrame) updatePodHeader(s tcell.Screen) {
 				}
 				if f.nsItems[nsIndex].deployments[dIndex].isExpanded {
 					for pIndex := range f.nsItems[nsIndex].deployments[dIndex].pods {
-						if f.nameColWidth < ColumnSpacing+len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].name) {
-							f.nameColWidth = ColumnSpacing + len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].name)
+						if f.nameColWidth < PodXOffset+ColumnSpacing+len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].name) {
+							f.nameColWidth = PodXOffset + ColumnSpacing + len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].name)
 						}
 						if f.readyColWidth < ColumnSpacing+len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].ReadyString()) {
 							f.readyColWidth = ColumnSpacing + len(f.nsItems[nsIndex].deployments[dIndex].pods[pIndex].ReadyString())
@@ -182,7 +179,7 @@ func (f *InfoFrame) printNamespace(s tcell.Screen, ns *Namespace, yPos int) {
 		if readyCount != totalCount || ns.nsError.error != nil {
 			style = style.Foreground(tcell.ColorRed)
 		}
-		readyColPos := f.nameColWidth - NamespaceXOffset + PodXOffset
+		readyColPos := f.nameColWidth - NamespaceXOffset
 		drawS(s, ns.DisplayName(), NamespaceXOffset, f.y+yPos, readyColPos, style)
 		drawS(s, fmt.Sprintf("%v/%v", readyCount, totalCount), readyColPos, f.y+yPos, f.width-readyColPos, style)
 	} else {
@@ -210,7 +207,7 @@ func (f *InfoFrame) printPodGroup(s tcell.Screen, d *PodGroup, yPos int) {
 			style = style.Foreground(tcell.ColorGreen)
 		}
 
-		readyColPos := f.nameColWidth - NamespaceXOffset + PodXOffset
+		readyColPos := f.nameColWidth - NamespaceXOffset
 		drawS(s, d.name, PodGroupXOffset, f.y+yPos, readyColPos, style)
 		drawS(s, fmt.Sprintf("%v/%v", ready, total), readyColPos, f.y+yPos, f.width-readyColPos, style)
 	} else {
@@ -233,7 +230,7 @@ func (f *InfoFrame) printPod(s tcell.Screen, p *Pod, yPos int) {
 
 	xOffset := PodXOffset
 	drawS(s, p.name, xOffset, f.y+yPos, f.nameColWidth, style)
-	xOffset += f.nameColWidth
+	xOffset += f.nameColWidth - PodXOffset
 	drawS(s, p.ReadyString(), xOffset, f.y+yPos, f.readyColWidth, style)
 	xOffset += f.readyColWidth
 	drawS(s, p.status, xOffset, f.y+yPos, f.statusColWidth, style)

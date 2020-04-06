@@ -1,7 +1,8 @@
-# This is an initial attempt to make clipboard shortcuts configurable
-# Available element types: namespace, group, pod, container, namespaceerror, namespacemessage
+# Configurable clipboard shortcuts can be mapped to keys 0-9 and a-z with exception to 'e' and 'c' which at this moment are reserved for
+# collapsing and expanding actions.
+#
 # Available variables to use in templates, case sensitive: {{.Context}}, {{.Namespace}}, {{.Group}}, {{.Pod}}, {{.Container}}
-
+# Available element types: namespace, group, pod, container
 clipboardShortcuts:
   # Element type where the cursor is positioned.
   namespace:
