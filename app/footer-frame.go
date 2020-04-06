@@ -6,24 +6,26 @@ import (
 )
 
 type FooterFrame struct {
-	x, y          int
-	width, height int
-	lines         []string
-	statusBar     *StringItem
-	statusBarCh   chan string
+	x, y               int
+	width, height      int
+	lines              []string
+	clipboardShortcuts map[Type][]string
+	statusBar          *StringItem
+	statusBarCh        chan string
 }
 
 func NewFooterFrame(s tcell.Screen) *FooterFrame {
 	winWidth, winHeight := s.Size()
 	sbCh := make(chan string)
 	frame := FooterFrame{
-		x:           0,
-		y:           winHeight - FooterFrameHeight,
-		width:       winWidth,
-		height:      FooterFrameHeight,
-		lines:       make([]string, FooterFrameHeight-1),
-		statusBar:   &StringItem{x: 0, y: winHeight - 1, length: 0, value: ""},
-		statusBarCh: sbCh,
+		x:                  0,
+		y:                  winHeight - FooterFrameHeight,
+		width:              winWidth,
+		height:             FooterFrameHeight,
+		lines:              make([]string, FooterFrameHeight-1),
+		clipboardShortcuts: make(map[Type][]string),
+		statusBar:          &StringItem{x: 0, y: winHeight - 1, length: 0, value: ""},
+		statusBarCh:        sbCh,
 	}
 	frame.lines[0] = strings.Repeat("-", 25)
 	frame.listenForStatusMessages(s)
@@ -40,20 +42,17 @@ func (ff *FooterFrame) listenForStatusMessages(s tcell.Screen) {
 }
 
 func (ff *FooterFrame) updateShortcutInfo(s tcell.Screen, i Item) {
-	switch i.Type() {
-	case TypeNamespace:
-		ff.lines[1] = "1 = get all       3 = get events   5 = get secrets"
-		ff.lines[2] = "2 = get ingress   4 = describe     6 = get config map"
-	case TypePodGroup:
-		ff.lines[1] = "1 = describe   3 = scale   Ctrl+E = exec to all     Ctrl+K = follow logs from all"
-		ff.lines[2] = "2 = delete                 Ctrl+L = logs from all"
-	case TypePod:
-		ff.lines[1] = "1 = get logs   3 = describe     5 = scale   Ctrl+E = exec to all     Ctrl+K = follow logs from all"
-		ff.lines[2] = "2 = exec       4 = delete pod               Ctrl+L = logs from all"
-	case TypeContainer:
-		ff.lines[1] = "1 = get logs   Ctrl+E = exec to all     Ctrl+K = follow logs from all"
-		ff.lines[2] = "2 = exec       Ctrl+L = logs from all"
-	default:
+	csInfo, ok := ff.clipboardShortcuts[i.Type()]
+
+	if ok {
+		if len(csInfo) != 2 {
+			// Something went wrong here, should be always 2, for now.
+			ff.statusBarCh <- "Error trying to generate clipboard shortcut info."
+			return
+		}
+		ff.lines[1] = csInfo[0]
+		ff.lines[2] = csInfo[1]
+	} else {
 		ff.lines[1] = ""
 		ff.lines[2] = ""
 	}

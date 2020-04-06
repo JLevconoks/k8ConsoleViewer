@@ -1,8 +1,10 @@
 package app
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"github.com/JLevconoks/k8ConsoleViewer/clipboard"
 	"github.com/gdamore/tcell"
 	"log"
 	"os"
@@ -25,9 +27,11 @@ type NsGroup struct {
 type App struct {
 	k8Client K8Client
 	group    Group
+	// This is a bit ugly, but will do for now...
+	commandShortcuts map[Type]map[rune]ClipboardShortcut
 }
 
-func NewApp(context string, namespace string) (App, error) {
+func NewApp(context string, namespace string, settings map[string]interface{}) (App, error) {
 	contextNameSet := make(map[string]struct{})
 	contextNameSet[context] = struct{}{}
 	k8Client, err := NewK8ClientSets(contextNameSet)
@@ -45,13 +49,18 @@ func NewApp(context string, namespace string) (App, error) {
 		g = buildGroup(fmt.Sprintf("%v/%v", context, namespace), context, namespace)
 	}
 
+	cs, err := getClipboardShortcuts(settings)
+	if err != nil {
+		return App{}, err
+	}
 	return App{
-		k8Client: k8Client,
-		group:    g,
+		k8Client:         k8Client,
+		group:            g,
+		commandShortcuts: cs,
 	}, nil
 }
 
-func NewAppFromGroup(group Group) (App, error) {
+func NewAppFromGroup(group Group, settings map[string]interface{}) (App, error) {
 	contextNameSet := make(map[string]struct{})
 	for i := range group.NsGroups {
 		contextNameSet[group.NsGroups[i].Context] = struct{}{}
@@ -60,10 +69,33 @@ func NewAppFromGroup(group Group) (App, error) {
 	if err != nil {
 		return App{}, err
 	}
+
+	cs, err := getClipboardShortcuts(settings)
+	if err != nil {
+		return App{}, err
+	}
+
 	return App{
-		k8Client: k8Client,
-		group:    group,
+		k8Client:         k8Client,
+		group:            group,
+		commandShortcuts: cs,
 	}, nil
+}
+
+func getClipboardShortcuts(settings map[string]interface{}) (map[Type]map[rune]ClipboardShortcut, error) {
+	cs, err := convertFromViperSettings(settings)
+	if err != nil {
+		return nil, err
+	}
+	// this is the case when 'clipboardShortcuts' block is not present in config.
+	if cs == nil {
+		cs, err = defaultClipboardShortcuts()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return cs, nil
 }
 
 func (app *App) Run() {
@@ -80,6 +112,7 @@ func (app *App) Run() {
 
 	s.Clear()
 	gui := NewGui(s, app.group.Name)
+	gui.footerFrame.clipboardShortcuts = getShortcutDisplayMap(app.commandShortcuts)
 	gui.show(s)
 
 	quit := make(chan []string)
@@ -92,7 +125,7 @@ func (app *App) Run() {
 			endTime := time.Now()
 
 			errorMessages := make([]string, 0)
-			for index, _ := range podListResults {
+			for index := range podListResults {
 				if podListResults[index].error != nil {
 					errorMessages = append(errorMessages, fmt.Sprintf("Context: %v Namespace: %v, Error: %v", podListResults[index].context, podListResults[index].namespace, podListResults[index].Error()))
 				}
@@ -157,11 +190,19 @@ func (app *App) Run() {
 				}
 				switch ev.Rune() {
 				case 'c':
-					gui.handleCollapseAll()
+					gui.handleCollapseEvent()
 				case 'e':
-					gui.handleExpandAll()
+					gui.handleExpandEvent()
 				default:
-					gui.handleRune(ev.Rune())
+					data := gui.getCurrentGuiItemInfo()
+					value, err := app.handleClipboardShortcut(ev.Rune(), data)
+					if err != nil {
+						gui.statusBarCh <- "Error: " + err.Error()
+						continue
+					}
+					if value != "" {
+						gui.statusBarCh <- "Clipboard: " + value
+					}
 				}
 
 			case *tcell.EventResize:
@@ -181,6 +222,36 @@ func (app *App) Run() {
 	for _, s := range exitMessages {
 		log.Println(s)
 	}
+}
+
+func (app *App) handleClipboardShortcut(r rune, data GuiItemInfo) (string, error) {
+	scMap, ok := app.commandShortcuts[data.itemType]
+	if !ok {
+		return "", nil
+	}
+
+	shortcut, ok := scMap[r]
+	if !ok {
+		return "", nil
+	}
+
+	var buf bytes.Buffer
+	err := shortcut.template.Execute(&buf, data)
+	if err != nil {
+		return "", err
+	}
+
+	value := buf.String()
+	if value == "" {
+		return "", nil
+	}
+
+	err = clipboard.ToClipboard(value)
+	if err != nil {
+		return "", err
+	}
+
+	return value, nil
 }
 
 func buildGroup(groupName string, context string, namespace ...string) Group {

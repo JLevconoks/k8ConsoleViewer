@@ -1,0 +1,60 @@
+# Configurable clipboard shortcuts can be mapped to keys 0-9 and a-z with exception to 'e' and 'c' which at this moment are reserved for
+# collapsing and expanding actions.
+#
+# Available variables to use in templates, case sensitive: {{.Context}}, {{.Namespace}}, {{.Group}}, {{.Pod}}, {{.Container}}
+# Available element types: namespace, group, pod, container
+clipboardShortcuts:
+  # Element type where the cursor is positioned.
+  namespace:
+    # Shortcut keys 0-9 and a-z, some other characters can work, but not tested.
+    '1':
+      # Display name in footer
+      name: "get all"
+      # Shortcut template to be copied in your clipboard.
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} get all"
+    '2':
+      name: "ingress"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} get ingress"
+    '3':
+      name: "events"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} get ev --sort-by=.lastTimestamp"
+    '4':
+      name: "describe"
+      template: "kubectl --context {{.Context}} describe ns {{.Namespace}}"
+    '5':
+      name: "secrets"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} get secrets"
+    '6':
+      name: "cm"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} get cm"
+  group:
+    '1':
+      name: "describe"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} describe deployment {{.Group}}"
+    '2':
+      name: "delete"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} delete deployment {{.Group}}"
+    '3':
+      name: "scale"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} scale deployment {{.Group}} --replicas="
+  pod:
+    '1':
+      name: "logs"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} logs {{.Pod}}"
+    '2':
+      name: "exec"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} exec -it {{.Pod}} /bin/bash"
+    '3':
+      name: "describe"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} describe pod {{.Pod}}"
+    '4':
+      name: "delete"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} delete pod {{.Pod}}"
+  container:
+    '1':
+      name: "logs"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} logs {{.Pod}} -c {{.Container}}"
+    '2':
+      name: "exec"
+      template: "kubectl --context {{.Context}} -n {{.Namespace}} exec -it {{.Pod}} -c {{.Container}} /bin/bash"
+
