@@ -16,6 +16,7 @@ type InfoFrame struct {
 	width, height    int
 	cursorX, cursorY int
 	scrollYOffset    int
+	expandLevel      int
 	podHeader        StringItem
 	positions        []Item
 	nsItems          []Namespace
@@ -38,6 +39,7 @@ func NewInfoFrame(winWidth, winHeight int) *InfoFrame {
 		cursorX:          0,
 		cursorY:          0,
 		scrollYOffset:    0,
+		expandLevel:      0,
 		podHeader:        podHeader,
 		positions:        []Item{},
 		nsItems:          []Namespace{},
@@ -405,22 +407,55 @@ func (f *InfoFrame) expandCurrentItem(s tcell.Screen) {
 	}
 }
 
-func (f *InfoFrame) collapseAllItems(s tcell.Screen) {
-	for index, _ := range f.positions {
-		f.positions[index].Expanded(false)
+func (f *InfoFrame) applyExpandLevel() {
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+
+	for nsIndex := range f.nsItems {
+		if f.expandLevel >= 1 {
+			f.nsItems[nsIndex].Expanded(true)
+		} else {
+			f.nsItems[nsIndex].Expanded(false)
+		}
+
+		for gIndex := range f.nsItems[nsIndex].deployments {
+			if f.expandLevel >= 2 {
+				f.nsItems[nsIndex].deployments[gIndex].Expanded(true)
+			} else {
+				f.nsItems[nsIndex].deployments[gIndex].Expanded(false)
+			}
+
+			for cIndex := range f.nsItems[nsIndex].deployments[gIndex].pods {
+				if f.expandLevel >= 3 {
+					f.nsItems[nsIndex].deployments[gIndex].pods[cIndex].Expanded(true)
+				} else {
+					f.nsItems[nsIndex].deployments[gIndex].pods[cIndex].Expanded(false)
+				}
+			}
+		}
 	}
-	f.cursorY = 0
-	f.scrollYOffset = 0
+
+}
+
+func (f *InfoFrame) collapseByOneLevel(s tcell.Screen) {
+	if f.expandLevel < 1 {
+		f.cursorY = 0
+		f.scrollYOffset = 0
+	} else {
+		f.expandLevel = f.expandLevel - 1
+	}
+
+	f.applyExpandLevel()
 	f.refresh(s)
 }
 
-func (f *InfoFrame) expandAll(s tcell.Screen) {
-	for nIndex := range f.nsItems {
-		f.nsItems[nIndex].Expanded(true)
-		for dIndex := range f.nsItems[nIndex].deployments {
-			f.nsItems[nIndex].deployments[dIndex].Expanded(true)
-		}
+func (f *InfoFrame) expandByOneLevel(s tcell.Screen) {
+	if f.expandLevel >= 3 {
+		return
 	}
+
+	f.expandLevel = f.expandLevel + 1
+	f.applyExpandLevel()
 	f.refresh(s)
 }
 

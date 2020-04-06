@@ -131,14 +131,14 @@ func (gui *Gui) handleResize() {
 	gui.s.Show()
 }
 
-func (gui *Gui) handleCollapseAll() {
-	gui.mainFrame.collapseAllItems(gui.s)
+func (gui *Gui) handleCollapseEvent() {
+	gui.mainFrame.collapseByOneLevel(gui.s)
 	gui.updateStatusFrame()
 	gui.s.Show()
 }
 
-func (gui *Gui) handleExpandAll() {
-	gui.mainFrame.expandAll(gui.s)
+func (gui *Gui) handleExpandEvent() {
+	gui.mainFrame.expandByOneLevel(gui.s)
 	gui.updateStatusFrame()
 	gui.s.Show()
 }

@@ -190,9 +190,9 @@ func (app *App) Run() {
 				}
 				switch ev.Rune() {
 				case 'c':
-					gui.handleCollapseAll()
+					gui.handleCollapseEvent()
 				case 'e':
-					gui.handleExpandAll()
+					gui.handleExpandEvent()
 				default:
 					data := gui.getCurrentGuiItemInfo()
 					value, err := app.handleClipboardShortcut(ev.Rune(), data)
