@@ -34,8 +34,8 @@ Namespace name can contain wildcards for example 'foo*bar' will be converted to 
 `./k8ConsoleViewer -c foo -n "bar*"`  
   
 #### Hard coded Shortcuts/Hotkeys:   
-- `e` - expand all namespaces  
-- `c` - collapse all elements  
+- `e` - expand one level  
+- `c` - collapse one level  
 - `left` - collapse item / navigate to parent item  
 - `right` - expand item  
 - `PgUp` - scroll up a page  
