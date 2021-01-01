@@ -2,7 +2,7 @@ package app
 
 import (
 	"fmt"
-	"github.com/gdamore/tcell"
+	"github.com/gdamore/tcell/v2"
 	"sort"
 	"strconv"
 	"strings"
@@ -257,7 +257,7 @@ func (f *InfoFrame) printContainer(s tcell.Screen, c *Container, yPos int) {
 func (f *InfoFrame) updateNamespaces(podListResults []PodListResult) {
 	expanded := make(map[string]struct{}, 0)
 
-	for nsIndex, _ := range f.nsItems {
+	for nsIndex := range f.nsItems {
 		nsDisplayName := f.nsItems[nsIndex].DisplayName()
 		if f.nsItems[nsIndex].IsExpanded() {
 			expanded[nsDisplayName] = struct{}{}
@@ -291,7 +291,7 @@ func (f *InfoFrame) updateNamespaces(podListResults []PodListResult) {
 		return newNamespaces[i].name < newNamespaces[j].name
 	})
 
-	for nsIndex, _ := range newNamespaces {
+	for nsIndex := range newNamespaces {
 		nsDisplayName := newNamespaces[nsIndex].DisplayName()
 		_, ok := expanded[nsDisplayName]
 		if ok {

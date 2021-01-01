@@ -32,9 +32,8 @@ func Execute() {
 
 func init() {
 	rootCmd.Flags()
-	rootCmd.Flags().StringVarP(&context, "context", "c", "", "context value")
+	rootCmd.Flags().StringVarP(&context, "context", "c", "", "context value, defaults to current context in .kube config")
 	rootCmd.Flags().StringVarP(&namespace, "namespace", "n", "", "namespace value")
-	rootCmd.MarkFlagRequired("context")
 	rootCmd.MarkFlagRequired("namespace")
 
 	rootCmd.Version = fmt.Sprintf("%s (%s)", buildVersion, buildTime)

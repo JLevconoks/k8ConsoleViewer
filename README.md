@@ -13,7 +13,7 @@ namespace / context
       container-1
       container-2
 ```
-Please note: `group` is not always a deployment name, it is picked from available labels on the pod `deployment`, `statefulSet`, `job-name`, `app` in the priority order listed. 
+Please note: `group` label is picked from controller owner reference name minus the unique identifier at the end, if it is not present it is picked from available labels on the pod `deployment`, `statefulSet`, `job-name`, `app` in the priority order listed. 
 This might be not ideal but so far it worked fine in my use case. 
 
 ---
@@ -22,7 +22,7 @@ This might be not ideal but so far it worked fine in my use case.
 **Please note: each `context/namespace` pair is a separate `get pods` call to Kubernetes with your credentials every 5 seconds, so be considerate with the number of namespaces you are monitoring.**   
 
 - Download latest release from [releases page](https://github.com/JLevconoks/k8ConsoleViewer/releases)  
-- Run `./k8ConsoleViewer -c <context> -n <namespace>`   
+- Run `./k8ConsoleViewer -c <context> -n <namespace>` (`-c` is optional and defaults to current context in .kube config)
 
 #### Alternatively 
 - Create `groups.json` file alongside your download in the format similar to `groups-sample.json` - Run `./k8ConsoleViewer group <id>` or `./k8ConsoleViewer group <name>` based on the groups.json  

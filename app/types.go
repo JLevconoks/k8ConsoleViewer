@@ -3,10 +3,9 @@ package app
 import (
 	"errors"
 	"fmt"
-	"github.com/gdamore/tcell"
+	"github.com/gdamore/tcell/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/duration"
-	"k8s.io/kubernetes/pkg/util/node"
 	"sort"
 	"strings"
 	"time"
@@ -278,10 +277,20 @@ func toNamespace(plr *PodListResult) Namespace {
 func toPodGroup(pods []v1.Pod, parent *Namespace) []*PodGroup {
 	podGroup := make(map[string]*PodGroup)
 
+	ownerName := ""
 	for _, pod := range pods {
-		podGroupName := "_"
+		for _, r := range pod.OwnerReferences {
+			if *r.Controller {
+				pos := strings.LastIndex(r.Name, "-")
+				ownerName = r.Name[:pos]
+				break // There can only be one controller, no point going further.
+			}
+		}
 
+		podGroupName := "_"
 		switch {
+		case ownerName != "":
+			podGroupName = ownerName
 		case pod.Labels["deployment"] != "":
 			podGroupName = pod.Labels["deployment"]
 		case pod.Labels["statefulSet"] != "":
@@ -443,7 +452,7 @@ func podStats(pod *v1.Pod) (status string, ready int, total int, restarts int, c
 		}
 	}
 
-	if pod.DeletionTimestamp != nil && pod.Status.Reason == node.NodeUnreachablePodReason {
+	if pod.DeletionTimestamp != nil && pod.Status.Reason == "NodeLost" {
 		reason = "Unknown"
 	} else if pod.DeletionTimestamp != nil {
 		reason = "Terminating"

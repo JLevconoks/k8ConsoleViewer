@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
@@ -9,6 +10,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,10 +20,6 @@ type clientSetMap map[string]*kubernetes.Clientset
 
 type Client struct {
 	k8ClientSets clientSetMap
-}
-
-type K8Client interface {
-	podLists(group Group) []PodListResult
 }
 
 type getPodJob struct {
@@ -37,26 +35,40 @@ type PodListResult struct {
 }
 
 func NewK8ClientSets(contexts map[string]struct{}) (Client, error) {
-	configPath := filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return Client{}, errors.New("No config found in ~/.kube")
+	configPath, err := configPath()
+	if err != nil {
+		return Client{}, err
 	}
 
 	k8ClientSets := make(map[string]*kubernetes.Clientset)
-	for context := range contexts {
-		config, err := buildConfigFromFlags(context, configPath)
+	for ctx := range contexts {
+		config, err := buildConfigFromFlags(ctx, configPath)
 		if err != nil {
-			return Client{}, errors.Wrapf(err, "Error creating client config for context: %v", context)
+			return Client{}, errors.Wrapf(err, "Error creating client config for context: %v", ctx)
 		}
 
 		k8client, err := kubernetes.NewForConfig(config)
 		if err != nil {
-			return Client{}, errors.Wrapf(err, "Error creating clientset for context: %v", context)
+			return Client{}, errors.Wrapf(err, "Error creating clientset for context: %v", ctx)
 		}
-		k8ClientSets[context] = k8client
+		k8ClientSets[ctx] = k8client
 	}
 
 	return Client{k8ClientSets: k8ClientSets}, nil
+}
+
+func CurrentContextName() (string, error) {
+	configPath, err := configPath()
+	if err != nil {
+		return "", err
+	}
+
+	configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: configPath}
+	config, err := configRules.Load()
+	if err != nil {
+		return "", errors.Wrapf(err, "error loading default config from %v", configPath)
+	}
+	return config.CurrentContext, nil
 }
 
 func (k8Client Client) podLists(group Group) []PodListResult {
@@ -95,15 +107,15 @@ func (k8Client Client) podLists(group Group) []PodListResult {
 
 func getPods(k8Client Client, jobCh <-chan getPodJob, resultCh chan<- PodListResult, wg *sync.WaitGroup) {
 	for job := range jobCh {
-		podList, err := k8Client.k8ClientSets[job.context].CoreV1().Pods(job.namespace).List(metav1.ListOptions{})
+		podList, err := k8Client.k8ClientSets[job.context].CoreV1().Pods(job.namespace).List(context.Background(), metav1.ListOptions{})
 		resultCh <- PodListResult{job.context, job.namespace, *podList, err}
 	}
 	wg.Done()
 }
 
-func (k8Client Client) listNamespaces(context string) (*v1.NamespaceList, error) {
-	fmt.Printf("Getting namespace list for context: %v \n", context)
-	return k8Client.k8ClientSets[context].CoreV1().Namespaces().List(metav1.ListOptions{})
+func (k8Client Client) listNamespaces(ctxName string) (*v1.NamespaceList, error) {
+	fmt.Printf("Getting namespace list for context: %v \n", ctxName)
+	return k8Client.k8ClientSets[ctxName].CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
 }
 
 func buildConfigFromFlags(context, kubeconfigPath string) (*rest.Config, error) {
@@ -112,4 +124,13 @@ func buildConfigFromFlags(context, kubeconfigPath string) (*rest.Config, error) 
 		&clientcmd.ConfigOverrides{
 			CurrentContext: context,
 		}).ClientConfig()
+}
+
+func configPath() (string, error) {
+	configPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return "", errors.New(fmt.Sprintf("No config found in '%v'", configPath))
+	}
+
+	return configPath, nil
 }

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/JLevconoks/k8ConsoleViewer/clipboard"
-	"github.com/gdamore/tcell"
+	"github.com/gdamore/tcell/v2"
 	"log"
 	"os"
 	"regexp"
@@ -25,13 +25,20 @@ type NsGroup struct {
 }
 
 type App struct {
-	k8Client K8Client
+	k8Client Client
 	group    Group
 	// This is a bit ugly, but will do for now...
 	commandShortcuts map[Type]map[rune]ClipboardShortcut
 }
 
 func NewApp(context string, namespace string, settings map[string]interface{}) (App, error) {
+	if context == "" {
+		var err error
+		context, err = CurrentContextName()
+		if err != nil {
+			return App{}, err
+		}
+	}
 	contextNameSet := make(map[string]struct{})
 	contextNameSet[context] = struct{}{}
 	k8Client, err := NewK8ClientSets(contextNameSet)

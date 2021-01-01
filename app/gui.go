@@ -3,7 +3,7 @@ package app
 import (
 	"fmt"
 	"github.com/JLevconoks/k8ConsoleViewer/terminal"
-	"github.com/gdamore/tcell"
+	"github.com/gdamore/tcell/v2"
 	"time"
 )
 
@@ -77,6 +77,7 @@ func (gui *Gui) updateNamespaces(s tcell.Screen, podListResults []PodListResult,
 		timeStyle = timeStyle.Foreground(tcell.ColorYellow)
 	}
 	gui.execTime.UpdateS(s, timeToExec.String(), timeStyle)
+	gui.currentTime.Update(s, time.Now().Format(time.RFC1123Z))
 	gui.redraw(s)
 	gui.mainFrame.Mutex.Unlock()
 	gui.statusBarCh <- ""
@@ -270,8 +271,7 @@ func gatherContainerInfos(item Item) (context, nsName string, podNames, contName
 		context = pg.namespace.context
 		nsName = pg.namespace.name
 		podNames = pg.podNames()
-		// TODO check for empty slice
-		contNames = pg.pods[0].containerNames()
+		contNames = containerNamesFromPodGroup(pg)
 	case TypePod:
 		p := item.(*Pod)
 		context = p.podGroup.namespace.context
@@ -312,4 +312,23 @@ func drawS(s tcell.Screen, value string, x, y, length int, style tcell.Style) {
 
 func draw(s tcell.Screen, value string, x, y, length int, style tcell.Style) {
 	drawS(s, value, x, y, length, style)
+}
+
+func containerNamesFromPodGroup(pg *PodGroup) []string {
+	nameSet := make(map[string]struct{})
+
+	for _, pod := range pg.pods {
+		names := pod.containerNames()
+
+		for _, name := range names {
+			nameSet[name] = struct{}{}
+		}
+	}
+
+	contNames := make([]string, 0)
+	for name := range nameSet {
+		contNames = append(contNames, name)
+	}
+
+	return contNames
 }
