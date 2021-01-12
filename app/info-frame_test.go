@@ -2,7 +2,7 @@ package app
 
 import (
 	"fmt"
-	"github.com/gdamore/tcell"
+	"github.com/gdamore/tcell/v2"
 	"strconv"
 	"testing"
 )
